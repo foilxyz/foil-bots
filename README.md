@@ -5,12 +5,8 @@
 1. Install Python 3.11 or higher
 
    ```bash
-   # On macOS using homebrew:
    brew install python@3.11
 
-   # On Ubuntu/Debian:
-   sudo apt update
-   sudo apt install python3.11 python3.11-venv
    ```
 
 2. Install Poetry (Python dependency management)
@@ -113,5 +109,3 @@
   ```bash
   export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
   ```
-
-- For Windows users, use PowerShell and replace `export` with `$env:`
