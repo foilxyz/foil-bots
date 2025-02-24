@@ -1,9 +1,12 @@
+import asyncio
 import logging
+from datetime import datetime
 
 from web3 import Web3
 
 from .api_client import FoilAPIClient
 from .config import BotConfig
+from .exceptions import SkipBotRun
 from .foil import Foil
 from .position import Position
 from .strategy import BotStrategy
@@ -66,22 +69,37 @@ class LoomBot:
 
     async def start(self):
         """Start the bot"""
-        self.logger.info("Starting bot...")
-
-        # get prices
-        # Get avg trailing price
-        trailing_avg_price = self.api_client.get_trailing_average(
-            resource_slug="ethereum-gas",
-        )
-        resource_price = self.foil.get_current_price_d18()
-        resource_price = self.w3.from_wei(resource_price, "ether")
-        self.logger.info(
-            f"""
-                ----------------------
-                | Price Details     |
-                ----------------------
-                Trailing Average:  {trailing_avg_price}
-                Current Price:     {resource_price}"""
-        )
+        self.logger.info(f"Starting bot with {self.config.bot_run_interval} second interval...")
         strategy = BotStrategy(self.position, self.foil, self.account_address)
-        strategy.run(trailing_avg_price, resource_price)
+
+        while True:
+            try:
+                start_time = datetime.now()
+                self.logger.info(f"Starting Bot Run - Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+                # get prices
+                trailing_avg_price = self.api_client.get_trailing_average(
+                    resource_slug="ethereum-gas",
+                )
+                current_market_price = self.foil.get_current_price_d18()
+                current_market_price = self.w3.from_wei(current_market_price, "ether")
+                self.logger.info(f"Price Details - Trailing Avg: {trailing_avg_price}, Current: {current_market_price}")
+
+                strategy.run(current_market_price, trailing_avg_price)
+
+                end_time = datetime.now()
+                duration = (end_time - start_time).total_seconds()
+                self.logger.info(f"Completed Run in {duration:.2f}s - Next in {self.config.bot_run_interval}s")
+
+                await asyncio.sleep(self.config.bot_run_interval)
+            except KeyboardInterrupt:
+                self.logger.info("Bot stopped by user")
+                raise
+            except SkipBotRun:
+                self.logger.info("Skipping bot run due to already optimized position")
+                self.logger.info(f"Next run in {self.config.bot_run_interval}s")
+                await asyncio.sleep(self.config.bot_run_interval)
+            except Exception as e:
+                self.logger.error(f"Error during bot execution: {str(e)}")
+                self.logger.info(f"Next run in {self.config.bot_run_interval}s")
+                await asyncio.sleep(self.config.bot_run_interval)

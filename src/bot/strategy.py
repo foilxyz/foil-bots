@@ -1,6 +1,7 @@
 import logging
 
 from .config import BotConfig
+from .exceptions import SkipBotRun
 from .utils import price_to_tick
 
 
@@ -33,10 +34,7 @@ class BotStrategy:
                     Min Position Size:  {min_position_size}"""
                 )
                 raise ValueError("Insufficient balance to open position")
-            print(trailing_avg_tick)
-            print(current_tick)
-            print(self.config.risk_spread_spacing_width)
-            print(self.foil.epoch["base_asset_max_tick"])
+
             if trailing_avg_tick + self.config.risk_spread_spacing_width > self.foil.epoch["base_asset_max_tick"]:
                 raise ValueError("Trailing average too high to open position (Out of Range)")
 
@@ -55,26 +53,20 @@ class BotStrategy:
             Is Market Price Higher:{is_current_price_higher}"""
         )
 
-        if is_current_price_higher and current_position_tick_lower == current_price + tick_spacing:
-            raise ValueError(
+        if is_current_price_higher and current_position_tick_lower == current_tick + tick_spacing:
+            raise SkipBotRun(
                 f"Position is optimized to 1 tick space away from current price tick: {current_tick}, Skipping..."
             )
 
         risk_adjusted_lower_tick = trailing_avg_tick + (tick_spacing * self.config.risk_spread_spacing_width)
 
         if not is_current_price_higher and current_position_tick_lower == risk_adjusted_lower_tick:
-            raise ValueError(
+            raise SkipBotRun(
                 f"Position is optimized to risk adjusted tick spacing away from average trailing price tick: "
                 f"{risk_adjusted_lower_tick}, Skipping..."
             )
 
-        self.logger.info(
-            """
-            ----------------------
-            | Rebalance Needed! |
-            ----------------------
-            Conditions met for rebalancing, executing..."""
-        )
+        self.logger.info("!!!---Conditions met for rebalancing---!!!")
 
         return (current_tick, trailing_avg_tick)
 
@@ -108,10 +100,10 @@ class BotStrategy:
             high_tick = min(max_market_tick, low_tick + (tick_spacing * self.config.lp_range_width))
             return (low_tick, high_tick)
 
-    def run(self, trailing_avg_price: float, resource_price: float):
+    def run(self, current_market_price: float, trailing_avg_price: float):
         """Execute the rebalancing transaction"""
 
-        (current_tick, trailing_avg_tick) = self.check_conditions(trailing_avg_price, resource_price)
+        (current_tick, trailing_avg_tick) = self.check_conditions(current_market_price, trailing_avg_price)
 
         # Your rebalancing execution here
         if self.position.has_current_position():

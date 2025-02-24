@@ -27,7 +27,16 @@ class Position:
         self.hydrate_current_position()
 
     def hydrate_current_position(self):
-        self.position_id = self.foil.contract.functions.tokenOfOwnerByIndex(self.account_address, 0).call()
+        position_count = self.foil.contract.functions.balanceOf(self.account_address).call()
+
+        if position_count == 0:
+            self.logger.info("No positions found")
+            return
+
+        # get latest position
+        self.position_id = self.foil.contract.functions.tokenOfOwnerByIndex(
+            self.account_address, position_count - 1
+        ).call()
 
         (_, kind, _, _, _, _, _, _, uniswap_position_id, _) = self.foil.contract.functions.getPosition(
             self.position_id
@@ -185,7 +194,7 @@ class Position:
         self.logger.info(
             f"""
             ----------------------
-            | Position Details  |
+            | Quoted LP Position |
             ----------------------
             Deposit Amount:     {deposit_amount}
             Token0 Amount:      {token0_amount}
@@ -193,7 +202,7 @@ class Position:
         )
 
         # Approve collateral spending
-        receipt = send_transaction(
+        send_transaction(
             self.w3,
             self.foil.market_params["collateral_asset"].functions.approve,
             self.account_address,
@@ -223,7 +232,7 @@ class Position:
 
         try:
             # Send transaction
-            receipt = send_transaction(
+            send_transaction(
                 self.w3,
                 self.foil.contract.functions.createLiquidityPosition,
                 self.account_address,
