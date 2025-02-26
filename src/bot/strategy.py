@@ -35,6 +35,7 @@ class BotStrategy:
                 )
                 raise ValueError("Insufficient balance to open position")
 
+            # remove this check
             if trailing_avg_tick + self.config.risk_spread_spacing_width > self.foil.epoch["base_asset_max_tick"]:
                 raise ValueError("Trailing average too high to open position (Out of Range)")
 

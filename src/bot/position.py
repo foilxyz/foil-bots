@@ -14,6 +14,7 @@ class CurrentPosition(TypedDict):
     liquidity: int
     tick_lower: int
     tick_upper: int
+    collateral_amount: int
 
 
 class Position:
@@ -37,6 +38,7 @@ class Position:
                 "liquidity": 0,
                 "tick_lower": 0,
                 "tick_upper": 0,
+                "collateral_amount": 0,
             }
             return
 
@@ -45,7 +47,7 @@ class Position:
             self.account_address, position_count - 1
         ).call()
 
-        (_, kind, _, _, _, _, _, _, uniswap_position_id, _) = self.foil.contract.functions.getPosition(
+        (_, kind, _, collateral_amount, _, _, _, _, uniswap_position_id, _) = self.foil.contract.functions.getPosition(
             self.position_id
         ).call()
 
@@ -69,7 +71,8 @@ class Position:
                 Uniswap Position:  {uniswap_position_id}
                 Liquidity:         {liquidity}
                 Tick Lower:        {tick_lower}
-                Tick Upper:        {tick_upper}"""
+                Tick Upper:        {tick_upper}
+                Collateral Amount: {collateral_amount}"""
         )
 
         self.current = {
@@ -78,10 +81,11 @@ class Position:
             "liquidity": liquidity,
             "tick_lower": tick_lower,
             "tick_upper": tick_upper,
+            "collateral_amount": collateral_amount,
         }
 
     def has_current_position(self) -> bool:
-        return self.current["kind"] != 0
+        return self.current["kind"] != 0 and self.current["collateral_amount"] != 0
 
     def close_lp_position(self) -> int:
         """
