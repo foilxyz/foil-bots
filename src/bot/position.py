@@ -121,14 +121,6 @@ class Position:
         current_time = self.w3.eth.get_block("latest").timestamp
         deadline = current_time + (30 * 60)
 
-        # Create modify trader position params as tuple
-        modify_trade_params = (
-            self.position_id,  # positionId
-            0,  # size
-            0,  # deltaCollateralLimit
-            deadline,  # deadline
-        )
-
         # Send modify trader position transaction
         send_transaction(
             self.w3,
@@ -137,7 +129,10 @@ class Position:
             self.pk,
             self.logger,
             "LOOM: Close Trader Position",
-            modify_trade_params,
+            self.position_id,  # positionId
+            0,  # size
+            0,  # deltaCollateralLimit
+            deadline,  # deadline
         )
 
     def close_current_position(self):
