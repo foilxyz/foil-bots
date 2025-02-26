@@ -31,6 +31,13 @@ class Position:
 
         if position_count == 0:
             self.logger.info("No positions found")
+            self.current = {
+                "kind": 0,
+                "uniswap_position_id": 0,
+                "liquidity": 0,
+                "tick_lower": 0,
+                "tick_upper": 0,
+            }
             return
 
         # get latest position
