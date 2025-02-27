@@ -95,3 +95,67 @@ def send_transaction(
     except Exception as e:
         logger.error(f"Error in transaction {tx_description}: {str(e)}")
         raise
+
+
+def simulate_transaction(
+    w3: Web3,
+    contract_fn: Callable,
+    account_address: str,
+    logger: logging.Logger,
+    *args: Any,
+    **kwargs: Any,
+) -> dict:
+    """
+    Simulate a transaction without sending it to the blockchain.
+
+    Args:
+        w3: Web3 instance
+        contract_fn: Contract function to call
+        account_address: Sender address
+        logger: Logger instance
+        *args: Variable arguments for contract function
+        **kwargs: Additional transaction parameters
+
+    Returns:
+        dict: Simulation results containing success status, gas estimate, and call result
+    """
+    try:
+        # Try to estimate gas to check if transaction would succeed
+        gas_estimate = contract_fn(*args).estimate_gas({"from": account_address})
+
+        # If gas estimation succeeds, try to call the function
+        try:
+            # Simulate the call
+            result = contract_fn(*args).call({"from": account_address})
+
+            # Build a sample transaction (won't be sent)
+            base_fee = w3.eth.get_block("latest")["baseFeePerGas"]
+            priority_fee = w3.eth.max_priority_fee
+            max_fee = base_fee + priority_fee * 2
+
+            tx = contract_fn(*args).build_transaction(
+                {
+                    "from": account_address,
+                    "nonce": w3.eth.get_transaction_count(account_address, "pending"),
+                    "gas": int(gas_estimate * 1.2),  # 20% buffer
+                    "maxFeePerGas": max_fee,
+                    "maxPriorityFeePerGas": priority_fee,
+                    **kwargs,
+                }
+            )
+
+            logger.info(f"Estimated gas: {gas_estimate}")
+
+            return {"success": True, "gas_estimate": gas_estimate, "result": result, "transaction": tx}
+
+        except Exception as call_error:
+            return {
+                "success": False,
+                "gas_estimate": gas_estimate,
+                "error": str(call_error),
+                "error_type": "call_error",
+            }
+
+    except Exception as gas_error:
+        logger.error(f"Transaction would fail: {str(gas_error)}")
+        return {"success": False, "error": str(gas_error), "error_type": "gas_estimation_error"}

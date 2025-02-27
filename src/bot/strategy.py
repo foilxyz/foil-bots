@@ -54,19 +54,14 @@ class BotStrategy:
 
         # with active position
         if is_current_price_higher and current_position_tick_lower <= current_tick + tick_spacing:
-            raise SkipBotRun(
-                f"Position is optimized with current price being higher than the trailing average: {current_tick}, Skipping..."
-            )
+            raise SkipBotRun()
 
         risk_adjusted_lower_tick = trailing_avg_tick + (tick_spacing * self.config.risk_spread_spacing_width)
 
         if (
             not is_current_price_higher or current_tick == trailing_avg_tick
         ) and current_position_tick_lower == risk_adjusted_lower_tick:
-            raise SkipBotRun(
-                f"Position is optimized to risk adjusted tick spacing away from average trailing price tick: "
-                f"{risk_adjusted_lower_tick}, Skipping..."
-            )
+            raise SkipBotRun()
 
         self.logger.info("!!!---Conditions met for rebalancing---!!!")
 

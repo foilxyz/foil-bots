@@ -5,7 +5,7 @@ from web3 import Web3
 
 from .config import BotConfig
 from .foil import Foil
-from .utils import send_transaction, tick_to_sqrt_price_x96
+from .utils import send_transaction, simulate_transaction, tick_to_sqrt_price_x96
 
 
 class CurrentPosition(TypedDict):
@@ -103,7 +103,31 @@ class Position:
             deadline,  # deadline
         )
 
-        # Send decrease liquidity transaction
+        # First simulate the transaction to check the result
+        self.logger.info("Simulating decrease liquidity transaction...")
+        simulation_result = simulate_transaction(
+            self.foil.w3,
+            self.foil.contract.functions.decreaseLiquidityPosition,
+            self.account_address,
+            self.logger,
+            decrease_params,
+        )
+
+        if not simulation_result["success"]:
+            raise ValueError(f"Decrease liquidity simulation failed: {simulation_result['error']}")
+
+        # The function returns (decreasedAmount0, decreasedAmount1, collateralAmount)
+        decreased_amount0, decreased_amount1, collateral_amount = simulation_result["result"]
+
+        self.logger.info(
+            f"Simulation result: decreased_amount0={decreased_amount0}, decreased_amount1={decreased_amount1}, collateral_amount={collateral_amount}"
+        )
+
+        # If collateralAmount is greater than 0, it means the position will transition to a trader position
+        if collateral_amount > 0:
+            raise ValueError("Closing LP will cause position to transition to trader, aborting...")
+
+        # If we get here, it's safe to proceed with the actual transaction
         send_transaction(
             self.foil.w3,
             self.foil.contract.functions.decreaseLiquidityPosition,
@@ -114,9 +138,7 @@ class Position:
             decrease_params,
         )
 
-        # Check position after decrease
-        position = self.foil.contract.functions.getPosition(self.position_id).call()
-        return position[1]  # Return new kind
+        self.logger.info("LP Position successfully closed")
 
     def close_trader_position(self):
         """
@@ -144,25 +166,27 @@ class Position:
         try:
             if self.current["kind"] == 1:
                 self.logger.info("Closing LP Position")
-                kind = self.close_lp_position()
+                self.close_lp_position()
                 self.hydrate_current_position()
 
-                if kind == 0:
-                    self.logger.info("LP Position successfully closed")
-                elif kind == 1:
+                if self.current["kind"] != 0:
                     raise ValueError("Could not close position, something went wrong")
-                elif kind == 2:
-                    self.logger.info("LP Position transitioned to Trader Position")
-                    self.close_trader_position()
-                    self.hydrate_current_position()
-                else:
-                    raise ValueError("Invalid position kind after decrease")
+
+                # elif kind == 1:
+                #     raise ValueError("Could not close position, something went wrong")
+                # elif kind == 2:
+                #     self.logger.info("LP Position transitioned to Trader Position")
+                #     self.close_trader_position()
+                #     self.hydrate_current_position()
+                # else:
+                #     raise ValueError("Invalid position kind after decrease")
 
             # Handle trader position first if it exists
             if self.current["kind"] == 2:
-                self.logger.info("Closing Trader Position")
-                self.close_trader_position()
-                self.hydrate_current_position()
+                # self.logger.info("Closing Trader Position")
+                # self.close_trader_position()
+                # self.hydrate_current_position()
+                raise ValueError("Detected Trader Position, aborting...")
 
             # Final verification
             if self.current["kind"] != 0:
