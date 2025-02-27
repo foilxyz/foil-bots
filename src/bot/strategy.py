@@ -20,48 +20,49 @@ class BotStrategy:
             raise ValueError("Epoch is not live")
 
         (_, current_tick, trailing_avg_tick, is_current_price_higher) = self.get_max_tick(current_price, trailing_avg)
-
-        # if position is not active, raise error
-        if not self.position.has_current_position():
-            (has_minimum_balance, account_collateral_balance, min_position_size) = self.has_minimum_balance()
-            if not has_minimum_balance:
-                self.logger.info(
-                    f"""
-                    ----------------------
-                    | Balance Details   |
-                    ----------------------
-                    Account Balance:    {account_collateral_balance}
-                    Min Position Size:  {min_position_size}"""
-                )
-                raise ValueError("Insufficient balance to open position")
-
-            # remove this check
-            if trailing_avg_tick + self.config.risk_spread_spacing_width > self.foil.epoch["base_asset_max_tick"]:
-                raise ValueError("Trailing average too high to open position (Out of Range)")
-
         tick_spacing = self.foil.market_params["tick_spacing"]
         current_position_tick_lower = self.position.current["tick_lower"]
+        current_position_tick_upper = self.position.current["tick_upper"]
 
         self.logger.info(
             f"""
             ----------------------
-            | Tick Information  |
+            | Tick Information   |
             ----------------------
-            Current Tick:          {current_tick}
-            Trailing Avg Tick:     {trailing_avg_tick} 
-            Tick Spacing:          {tick_spacing}
-            Position Lower Tick:   {current_position_tick_lower}
-            Is Market Price Higher:{is_current_price_higher}"""
+            Current Tick:           {current_tick}
+            Trailing Avg Tick:      {trailing_avg_tick}
+            Tick Spacing:           {tick_spacing}
+            Current Position Lower: {current_position_tick_lower}
+            Current Position Upper: {current_position_tick_upper}
+            Is Market Price Higher: {is_current_price_higher}"""
         )
 
-        if is_current_price_higher and current_position_tick_lower == current_tick + tick_spacing:
+        # if no active position
+        if not self.position.has_current_position():
+            (has_minimum_balance, account_collateral_balance, min_position_size) = self.has_minimum_balance()
+            if not has_minimum_balance:
+                self.logger.info(
+                    f"Balance Details - Account Balance: {account_collateral_balance}, Min Position Size: {min_position_size}"
+                )
+                raise ValueError("Insufficient balance to open position")
+
+            if trailing_avg_tick + self.config.risk_spread_spacing_width > self.foil.epoch["base_asset_max_tick"]:
+                raise ValueError("Trailing average too high to open position (Out of Range)")
+
+            self.logger.info("conditions met for opening new LP position")
+            return (current_tick, trailing_avg_tick)
+
+        # with active position
+        if is_current_price_higher and current_position_tick_lower <= current_tick + tick_spacing:
             raise SkipBotRun(
-                f"Position is optimized to 1 tick space away from current price tick: {current_tick}, Skipping..."
+                f"Position is optimized with current price being higher than the trailing average: {current_tick}, Skipping..."
             )
 
         risk_adjusted_lower_tick = trailing_avg_tick + (tick_spacing * self.config.risk_spread_spacing_width)
 
-        if not is_current_price_higher and current_position_tick_lower == risk_adjusted_lower_tick:
+        if (
+            not is_current_price_higher or current_tick == trailing_avg_tick
+        ) and current_position_tick_lower == risk_adjusted_lower_tick:
             raise SkipBotRun(
                 f"Position is optimized to risk adjusted tick spacing away from average trailing price tick: "
                 f"{risk_adjusted_lower_tick}, Skipping..."
