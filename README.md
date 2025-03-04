@@ -1,111 +1,153 @@
-# Liquidity Loom Bot
+# Loom Bot
+
+A Web3 bot for automated market making on the FOIL protocol, built with Python.
+
+## Features
+
+- Automated position management for FOIL protocol
+- Real-time price monitoring and position optimization
+- Discord notifications for important events and errors
+- Configurable trading parameters
+- Support for both LP and trader positions (trader: coming soon)
 
 ## Prerequisites
 
-1. Install Python 3.11 or higher
+- Python 3.8 or higher
+- Web3.py
+- Discord.py
+- Access to an Ethereum node (e.g., Infura)
+- Discord bot token and channel ID
 
-   ```bash
-   brew install python@3.11
+## Installation
 
-   ```
+1. Clone the repository:
 
-2. Install Poetry (Python dependency management)
-   ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
+```bash
+git clone <repository-url>
+cd loom-bot
+```
 
-## Setup
+2. Install dependencies:
 
-1. Clone the repository
+```bash
+pip install -r requirements.txt
+```
 
-   ```bash
-   git clone https://github.com/yourusername/liquidity-loom.git
-   cd liquidity-loom
-   ```
+3. Create a `.env` file based on `.env.example`:
 
-2. Install dependencies
+```bash
+cp .env.example .env
+```
 
-   ```bash
-   poetry install
-   ```
+4. Configure your environment variables in `.env`:
 
-3. Create your environment file
+```env
+NETWORK_RPC_URL="https://mainnet.infura.io/v3/YOUR_KEY"
 
-   ```bash
-   cp .env.example .env
-   ```
+# Contract addresses
+FOIL_ADDRESS="0x..."
 
-4. Configure your `.env` file with your settings:
+# Trading parameters
+RISK_SPREAD_SPACING_WIDTH=5
+LP_RANGE_WIDTH=20
+MIN_POSITION_SIZE=100000000000000000
+MAX_POSITION_SIZE=200000000000000000
+TRAILING_AVERAGE_DAYS=28
 
-   ```env
-   NETWORK_RPC_URL="https://sepolia.infura.io/v3/YOUR-API-KEY"
-   FOIL_ADDRESS="0xe59c049a3424bafb05701fefeb16eaab823e507e"
+# Wallet PK
+WALLET_PK="0x..."
 
-   # Trading parameters
-   RISK_SPREAD_SPACING_WIDTH=5
-   LP_RANGE_WIDTH=20
-   MIN_POSITION_SIZE=100000000000000000
-   MAX_POSITION_SIZE=200000000000000000
-   TRAILING_AVERAGE_DAYS=28
+# FOIL API URL
+FOIL_API_URL="https://api.staging.foil.xyz"
 
-   # Your wallet's private key
-   WALLET_PK="your-private-key-here"
+# Bot run interval in seconds
+BOT_RUN_INTERVAL=60
 
-   # FOIL API URL
-   FOIL_API_URL="https://api.staging.foil.xyz"
+# Discord
+DISCORD_BOT_TOKEN="..."
+DISCORD_CHANNEL_ID="..."
+```
 
-   # Bot run interval in seconds
-   BOT_RUN_INTERVAL=600
-   ```
+## Discord Bot Setup
 
-## Running the Bot
+1. Create a new Discord application at [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a bot for your application
+3. Enable the "Message Content Intent" in the Bot section
+4. Copy the bot token and add it to your `.env` file
+5. Invite the bot to your server with proper permissions:
+   - Send Messages
+   - Read Message History
+6. Get your channel ID (right-click channel → Copy ID) and add it to your `.env` file
 
-1. Activate the poetry shell
+## Usage
 
-   ```bash
-   poetry shell
-   ```
+Run the bot:
 
-2. Run the bot
-   ```bash
-   python -m src.bot
-   ```
+```bash
+python -m src.bot
+```
 
-## Development
+The bot will:
 
-1. Install development dependencies
+- Connect to the FOIL protocol
+- Monitor market prices
+- Manage positions based on configured strategy
+- Send notifications to Discord for important events
 
-   ```bash
-   poetry install --with dev
-   ```
+## Discord Notifications
 
-2. Run linting
+The bot sends notifications for:
 
-   ```bash
-   poetry run ruff check src/
-   ```
+- Bot initialization and startup
+- Price updates
+- Position creation and closure
+- Errors and warnings
+- Bot shutdown
 
-3. Run formatter
+## Configuration
 
-   ```bash
-   poetry run black src/
-   ```
+Key configuration parameters in `.env`:
 
-4. Run type checking
-   ```bash
-   poetry run mypy src/
-   ```
+- `NETWORK_RPC_URL`: Your Ethereum node URL
+- `FOIL_ADDRESS`: FOIL contract address
+- `WALLET_PK`: Your wallet's private key
+- `RISK_SPREAD_SPACING_WIDTH`: Width of risk spread spacing
+- `LP_RANGE_WIDTH`: Width of LP range
+- `MIN_POSITION_SIZE`: Minimum position size in wei
+- `MAX_POSITION_SIZE`: Maximum position size in wei
+- `TRAILING_AVERAGE_DAYS`: Number of days for trailing average
+- `BOT_RUN_INTERVAL`: Bot execution interval in seconds
+- `DISCORD_BOT_TOKEN`: Your Discord bot token
+- `DISCORD_CHANNEL_ID`: Target Discord channel ID
 
-## Troubleshooting
+## Error Handling
 
-- If poetry command not found, add to PATH:
+The bot includes comprehensive error handling:
 
-  ```bash
-  export PATH="$HOME/.local/bin:$PATH"
-  ```
+- Transaction simulation before execution
+- Position transition checks
+- Network connection monitoring
+- Discord notifications for errors
 
-- If you get SSL errors with poetry:
+## Security
 
-  ```bash
-  export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
-  ```
+- Never share your private key or bot token
+- Keep your `.env` file secure and never commit it to version control
+- Use environment variables for sensitive data
+- Consider using a dedicated wallet for the bot
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
+
+## License
+
+MIT
+
+## Disclaimer
+
+This bot is for educational purposes only. Use at your own risk. The authors are not responsible for any financial losses incurred through the use of this bot.

@@ -6,6 +6,7 @@ from web3 import Web3
 
 from .api_client import FoilAPIClient
 from .config import BotConfig
+from .discord_client import DiscordNotifier
 from .exceptions import SkipBotRun
 from .foil import Foil
 from .position import Position
@@ -30,6 +31,9 @@ class LoomBot:
         # Load foil
         self.foil = Foil(self.w3)
 
+        # Initialize Discord notifier
+        self.discord = DiscordNotifier.get_instance()
+
         # Load account address
         self.account_address = self.w3.eth.account.from_key(self.config.wallet_pk).address
         self.logger.info(f"Using wallet address: {self.account_address}")
@@ -39,6 +43,9 @@ class LoomBot:
         self.position = Position(self.account_address, self.foil, self.w3)
 
         self.logger.info("Bot initialization complete")
+
+        # Send initialization message to Discord
+        self.discord.send_message("🤖 Loom Bot initialized and ready!")
 
     def _setup_logger(self) -> logging.Logger:
         """Initialize logging configuration"""
@@ -70,6 +77,8 @@ class LoomBot:
     async def start(self):
         """Start the bot"""
         self.logger.info(f"Starting bot with {self.config.bot_run_interval} second interval...")
+        self.discord.send_message(f"🚀 Bot started with {self.config.bot_run_interval} second interval")
+
         strategy = BotStrategy(self.position, self.foil, self.account_address)
 
         while True:
@@ -94,6 +103,7 @@ class LoomBot:
                 await asyncio.sleep(self.config.bot_run_interval)
             except KeyboardInterrupt:
                 self.logger.info("Bot stopped by user")
+                self.discord.send_message("⛔ Bot stopped by user")
                 raise
             except SkipBotRun:
                 self.logger.info("Skipping bot run due to already optimized position")
@@ -101,5 +111,6 @@ class LoomBot:
                 await asyncio.sleep(self.config.bot_run_interval)
             except Exception as e:
                 self.logger.error(f"Error during bot execution: {str(e)}")
+                self.discord.send_message(f"❌ **Error**: {str(e)}")
                 self.logger.info(f"Next run in {self.config.bot_run_interval}s")
                 await asyncio.sleep(self.config.bot_run_interval)

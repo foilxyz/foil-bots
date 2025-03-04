@@ -32,6 +32,14 @@ class Foil:
 
         self._hydrate_market_and_epoch()
 
+        # Send message to Discord with foil address and epoch id
+        from .discord_client import DiscordNotifier
+
+        discord = DiscordNotifier.get_instance()
+        discord.send_message(
+            f"🧠 **Foil Market Connected**\n- Contract: {foil_address}\n- Epoch ID: {self.epoch['epoch_id']}"
+        )
+
     def is_live(self) -> str:
         """Get the token name"""
         current_time = self.w3.eth.get_block("latest").timestamp

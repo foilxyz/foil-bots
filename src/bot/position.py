@@ -25,6 +25,11 @@ class Position:
         self.pk = BotConfig.get_config().wallet_pk
         self.foil = foil
 
+        # Notify Discord about the new position
+        from .discord_client import DiscordNotifier
+
+        self.discord = DiscordNotifier.get_instance()
+
         self.hydrate_current_position()
 
     def hydrate_current_position(self):
@@ -137,6 +142,9 @@ class Position:
             "LOOM: Decrease Liquidity",
             decrease_params,
         )
+
+        # Notify Discord that the position was closed
+        self.discord.send_message(f"🔒 Closed LP Position ID: {self.position_id}")
 
         self.logger.info("LP Position successfully closed")
 
@@ -274,6 +282,17 @@ class Position:
 
             # Get new position details
             self.hydrate_current_position()
+
+            # Format message with position details
+            message = (
+                f"🆕 **New Position Created**\n"
+                f"- Position ID: {self.position_id}\n"
+                f"- Tick Range: {self.current['tick_lower']} to {self.current['tick_upper']}\n"
+                f"- Liquidity: {self.current['liquidity']}\n"
+                f"- Collateral Amount: {self.current['collateral_amount']}"
+            )
+
+            self.discord.send_message(message)
 
         except Exception as e:
             self.logger.error(f"Failed to create liquidity position: {str(e)}")
