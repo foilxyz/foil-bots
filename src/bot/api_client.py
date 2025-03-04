@@ -42,15 +42,13 @@ class FoilAPIClient:
         )
 
         now = int(time.time())
-        interval = 60 * 60  # 1 hour in seconds
-        trailing_time = 28 * 24 * 60 * 60  # 28 days in seconds
+        trailing_time = 5 * 60  # 5 minutes in seconds
 
         variables = {
             "slug": resource_slug,
-            "from": now - (trailing_time * 2),  # Two periods ago
+            "from": now - trailing_time,
             "to": now,
-            "interval": interval,
-            "trailingTime": trailing_time,
+            "interval": trailing_time,
         }
 
         try:
