@@ -21,21 +21,19 @@ class FoilAPIClient:
         query = gql(
             """
             query TrailingResourceCandles(
-                $slug: String!,
-                $from: Int!,
-                $to: Int!,
-                $interval: Int!,
-                $trailingTime: Int!
+                $slug: String!
+                $from: Int!
+                $to: Int!
+                $interval: Int!
             ) {
                 resourceTrailingAverageCandles(
-                    slug: $slug
-                    from: $from
-                    to: $to
-                    interval: $interval
-                    trailingTime: $trailingTime
+                  slug: $slug
+                  from: $from
+                  to: $to
+                  interval: $interval
                 ) {
-                    timestamp
-                    close
+                  timestamp
+                  close
                 }
             }
         """
