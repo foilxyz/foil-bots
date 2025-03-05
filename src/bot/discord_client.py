@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Optional
 
@@ -39,12 +40,15 @@ class DiscordNotifier:
         self.bot = commands.Bot(command_prefix="!", intents=intents)
         self.channel_id = int(self.config.discord_channel_id)
         self.ready = False
+        self.message_queue = asyncio.Queue()
 
         # Set up event handlers
         @self.bot.event
         async def on_ready():
             self.logger.info(f"Discord bot logged in as {self.bot.user}")
             self.ready = True
+            # Start processing messages from queue
+            asyncio.create_task(self._process_message_queue())
 
         # Start the bot in the background
         self._start_bot()
@@ -65,47 +69,28 @@ class DiscordNotifier:
         thread.start()
         self.logger.info("Discord bot started in background thread")
 
-    async def _send_message_async(self, message: str):
-        """Send a message to the configured channel (async version)"""
-        if not self.enabled:
-            return
-
-        try:
-            # Wait for bot to be ready
-            if not self.ready:
-                self.logger.warning("Discord bot not ready yet, message might not be sent")
-
-            # Get the channel
-            channel = self.bot.fetch_channel(self.channel_id)
-            if not channel:
-                self.logger.error(f"Could not find Discord channel with ID {self.channel_id}")
-                return
-
-            # Send the message
-            await channel.send(message)
-            self.logger.info(f"Discord message sent to channel {self.channel_id}")
-
-        except Exception as e:
-            self.logger.error(f"Error sending Discord message: {str(e)}")
+    async def _process_message_queue(self):
+        """Process messages from the queue once the bot is ready"""
+        while True:
+            message = await self.message_queue.get()
+            try:
+                channel = await self.bot.fetch_channel(self.channel_id)
+                await channel.send(message)
+                self.logger.info(f"Discord message sent to channel {self.channel_id}")
+            except Exception as e:
+                self.logger.error(f"Error sending Discord message: {str(e)}")
+            finally:
+                self.message_queue.task_done()
 
     def send_message(self, message: str):
-        """Send a message to the configured Discord channel"""
+        """Queue a message to be sent to the configured Discord channel"""
         if not self.enabled:
             return
 
-        import asyncio
-
-        # Create a new event loop for this thread if needed
         try:
+            # Get the event loop from the bot's thread
             loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        # Run the async send function
-        if loop.is_running():
-            # If we're already in an event loop, create a task
-            asyncio.create_task(self._send_message_async(message))
-        else:
-            # Otherwise run the coroutine directly
-            loop.run_until_complete(self._send_message_async(message))
+            # Add message to queue
+            loop.create_task(self.message_queue.put(message))
+        except Exception as e:
+            self.logger.error(f"Error queueing Discord message: {str(e)}")
