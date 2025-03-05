@@ -20,6 +20,8 @@ class BotConfig:
     max_position_size: float
     trailing_average_days: int
     bot_run_interval: int
+    discord_bot_token: Optional[str]
+    discord_channel_id: Optional[str]
 
     # Class variable for singleton instance
     _instance: ClassVar[Optional["BotConfig"]] = None
@@ -50,6 +52,10 @@ class BotConfig:
         max_position_size = float(os.getenv("MAX_POSITION_SIZE", "10"))
         trailing_average_days = int(os.getenv("TRAILING_AVERAGE_DAYS", "28"))
         bot_run_interval = int(os.getenv("BOT_RUN_INTERVAL", "600"))
+
+        # Discord configuration
+        discord_bot_token = os.getenv("DISCORD_BOT_TOKEN")
+        discord_channel_id = os.getenv("DISCORD_CHANNEL_ID")
 
         # Validate required variables
         if not all([rpc_url, foil_api_url, wallet_pk, foil_address]):
@@ -85,4 +91,6 @@ class BotConfig:
             max_position_size=max_position_size,
             trailing_average_days=trailing_average_days,
             bot_run_interval=bot_run_interval,
+            discord_bot_token=discord_bot_token,
+            discord_channel_id=discord_channel_id,
         )

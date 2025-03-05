@@ -44,7 +44,8 @@ class BotStrategy:
             (has_minimum_balance, account_collateral_balance, min_position_size) = self.has_minimum_balance()
             if not has_minimum_balance:
                 self.logger.info(
-                    f"Balance Details - Account Balance: {account_collateral_balance}, Min Position Size: {min_position_size}"
+                    f"Balance Details - Account Balance: {account_collateral_balance}, "
+                    f"Min Position Size: {min_position_size}"
                 )
                 raise ValueError("Insufficient balance to open position")
 

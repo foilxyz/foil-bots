@@ -125,7 +125,8 @@ class Position:
         decreased_amount0, decreased_amount1, collateral_amount = simulation_result["result"]
 
         self.logger.info(
-            f"Simulation result: decreased_amount0={decreased_amount0}, decreased_amount1={decreased_amount1}, collateral_amount={collateral_amount}"
+            f"Simulation result: decreased_amount0={decreased_amount0}, "
+            f"decreased_amount1={decreased_amount1}, collateral_amount={collateral_amount}"
         )
 
         # If collateralAmount is greater than 0, it means the position will transition to a trader position
