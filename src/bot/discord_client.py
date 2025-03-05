@@ -76,7 +76,7 @@ class DiscordNotifier:
                 self.logger.warning("Discord bot not ready yet, message might not be sent")
 
             # Get the channel
-            channel = self.bot.get_channel(self.channel_id)
+            channel = self.bot.fetch_channel(self.channel_id)
             if not channel:
                 self.logger.error(f"Could not find Discord channel with ID {self.channel_id}")
                 return
