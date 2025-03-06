@@ -53,7 +53,7 @@ class FoilAPIClient:
 
         logger = logging.getLogger("LoomBot.API")
         logger.info(f"Fetching trailing average for {resource_slug}")
-        logger.debug(
+        logger.info(
             f"Query variables: from={variables['from']}, to={variables['to']}, interval={variables['interval']}"
         )
 
