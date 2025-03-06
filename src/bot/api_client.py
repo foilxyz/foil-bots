@@ -49,6 +49,14 @@ class FoilAPIClient:
             "interval": trailing_time,
         }
 
+        import logging
+
+        logger = logging.getLogger("LoomBot.API")
+        logger.info(f"Fetching trailing average for {resource_slug}")
+        logger.debug(
+            f"Query variables: from={variables['from']}, to={variables['to']}, interval={variables['interval']}"
+        )
+
         try:
             result = self.client.execute(query, variable_values=variables)
             candles = result["resourceTrailingAverageCandles"]
