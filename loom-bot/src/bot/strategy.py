@@ -1,9 +1,10 @@
 import logging
 
+from shared.clients.discord_client import DiscordNotifier
+from shared.utils.web3_utils import price_to_tick
+
 from .config import BotConfig
-from .discord_client import DiscordNotifier
 from .exceptions import SkipBotRun
-from .utils import price_to_tick
 
 
 class BotStrategy:
@@ -13,7 +14,7 @@ class BotStrategy:
         self.logger = logging.getLogger("LoomBot")
         self.account_address = account_address
         self.config = BotConfig.get_config()
-        self.discord = DiscordNotifier.get_instance()
+        self.discord = DiscordNotifier.get_instance("LoomBot", BotConfig.get_config())
 
     def check_conditions(self, current_price: float, trailing_avg: float) -> tuple[int, int]:
         """Determine if position needs rebalancing based on price data"""

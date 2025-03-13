@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "loom-bot"
+version = "0.1.0"
+description = "A bot for automated liquidity provision on the FOIL protocol"
+authors = ["sunny <sunny@foil.xyz>"]
+readme = "README.md"
+packages = [
+    { include = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+web3 = "^6.15.1"
+python-dotenv = "^1.0.1"
+requests = "^2.31.0"
+typing-extensions = "^4.10.0"
+discord-py = "^2.5.0"
+gql = {extras = ["requests"], version = "^3.5.0"}
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+loom-bot = "src.bot.__main__:main" 

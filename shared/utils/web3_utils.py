@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from typing import Any, Callable, Union
+from typing import Any, Callable, Dict, Union
 
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
@@ -104,7 +104,7 @@ def simulate_transaction(
     logger: logging.Logger,
     *args: Any,
     **kwargs: Any,
-) -> dict:
+) -> Dict[str, Any]:
     """
     Simulate a transaction without sending it to the blockchain.
 
@@ -159,3 +159,26 @@ def simulate_transaction(
     except Exception as gas_error:
         logger.error(f"Transaction would fail: {str(gas_error)}")
         return {"success": False, "error": str(gas_error), "error_type": "gas_estimation_error"}
+
+
+def create_web3_provider(rpc_url: str, logger: logging.Logger) -> Web3:
+    """
+    Create and initialize a Web3 provider
+
+    Args:
+        rpc_url: RPC URL to connect to
+        logger: Logger instance
+
+    Returns:
+        Initialized Web3 instance
+    """
+    logger.info(f"Connecting to RPC: {rpc_url}")
+    w3 = Web3(Web3.HTTPProvider(rpc_url))
+
+    if not w3.is_connected():
+        raise ConnectionError(f"Failed to connect to Web3 provider at {rpc_url}")
+
+    chain_id = w3.eth.chain_id
+    logger.info(f"Connected to network with chain ID: {chain_id}")
+
+    return w3
