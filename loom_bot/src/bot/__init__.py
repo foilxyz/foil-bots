@@ -2,8 +2,6 @@ import asyncio
 import logging
 from datetime import datetime
 
-from web3 import Web3
-
 from shared.clients.discord_client import DiscordNotifier
 from shared.utils.web3_utils import create_web3_provider
 

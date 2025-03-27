@@ -33,6 +33,10 @@ class ConfigManager:
     @staticmethod
     def load_env(env_path: Optional[str] = None) -> None:
         """Load environment variables from .env file"""
+        # If no specific path is provided, check for a local .env file
+        if not env_path and os.path.exists(".env"):
+            env_path = ".env"
+
         load_dotenv(env_path or find_dotenv(), override=True)
 
     @staticmethod

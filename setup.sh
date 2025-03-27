@@ -14,35 +14,24 @@ if ! command -v poetry &> /dev/null; then
     curl -sSL https://install.python-poetry.org | python3 -
 fi
 
-# Install root dependencies
-echo -e "${GREEN}Installing root dependencies...${NC}"
+# Install dependencies at the root level only
+echo -e "${GREEN}Installing dependencies...${NC}"
+poetry lock
 poetry install
-
-# Install loom-bot dependencies
-echo -e "${GREEN}Installing loom-bot dependencies...${NC}"
-cd loom-bot
-poetry install
-cd ..
-
-# Install arbitrage-bot dependencies
-echo -e "${GREEN}Installing arbitrage-bot dependencies...${NC}"
-cd arbitrage-bot
-poetry install
-cd ..
 
 # Set up environment files if they don't exist
-if [ ! -f "loom-bot/.env" ]; then
-    echo -e "${YELLOW}Creating loom-bot .env file from template...${NC}"
-    cp loom-bot/.env.example loom-bot/.env
-    echo -e "${RED}Don't forget to edit loom-bot/.env with your configuration!${NC}"
+if [ ! -f "loom_bot/.env" ]; then
+    echo -e "${YELLOW}Creating loom_bot .env file from template...${NC}"
+    cp loom_bot/.env.example loom_bot/.env
+    echo -e "${RED}Don't forget to edit loom_bot/.env with your configuration!${NC}"
 fi
 
-if [ ! -f "arbitrage-bot/.env" ]; then
-    echo -e "${YELLOW}Creating arbitrage-bot .env file from template...${NC}"
-    cp arbitrage-bot/.env.example arbitrage-bot/.env
-    echo -e "${RED}Don't forget to edit arbitrage-bot/.env with your configuration!${NC}"
+if [ ! -f "garb_bot/.env" ]; then
+    echo -e "${YELLOW}Creating garb_bot .env file from template...${NC}"
+    cp garb_bot/.env.example garb_bot/.env
+    echo -e "${RED}Don't forget to edit garb_bot/.env with your configuration!${NC}"
 fi
 
 echo -e "${GREEN}Setup complete!${NC}"
 echo -e "${YELLOW}To run loom-bot:${NC} poetry run loom-bot"
-echo -e "${YELLOW}To run arbitrage-bot:${NC} poetry run arbitrage-bot" 
+echo -e "${YELLOW}To run garb-bot:${NC} poetry run garb-bot" 

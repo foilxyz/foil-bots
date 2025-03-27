@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from web3 import Web3
-
 from shared.config.config_manager import BaseConfig, ConfigManager
 
 

@@ -6,19 +6,17 @@ authors = ["sunny <sunny@foil.xyz>"]
 readme = "README.md"
 packages = [
     { include = "shared" },
-    { include = "loom-bot" },
-    { include = "arbitrage-bot" }
+    { include = "loom_bot" },
+    { include = "garb_bot" }
 ]
 
 [tool.poetry.dependencies]
 python = "^3.8"
 web3 = "^6.15.1"
 python-dotenv = "^1.0.1"
-requests = "^2.31.0"
-typing-extensions = "^4.10.0"
 discord-py = "^2.5.0"
 aiohttp = "^3.9.3"
-gql = {extras = ["aiohttp"], version = "^3.5.0"}
+gql = {extras = ["aiohttp", "requests"], version = "^3.5.0"}
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.3.0"
@@ -29,8 +27,8 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-loom-bot = "loom-bot.src.bot.__main__:main"
-arbitrage-bot = "arbitrage-bot.src.bot.__main__:main"
+loom-bot = "loom_bot.src.bot.__main__:main"
+garb-bot = "garb_bot.src.bot.__main__:main"
 
 [tool.black]
 line-length = 120
