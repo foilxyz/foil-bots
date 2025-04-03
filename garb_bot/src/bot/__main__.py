@@ -22,11 +22,15 @@ async def main_async():
 
 def main():
     """Main function"""
-    # Configure basic logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    # Configure basic logging - only once
+    root_logger = logging.getLogger()
+
+    # Only configure if no handlers exist already
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
 
     # Run the async main function
     try:

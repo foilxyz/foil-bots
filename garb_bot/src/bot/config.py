@@ -15,16 +15,17 @@ class ArbitrageConfig(BaseConfig):
     # Network and wallet
     rpc_url: str
     wallet_pk: str
+    foil_api_url: str  # API URL for Foil
 
     # Trading parameters
-    min_profit_threshold: float  # Minimum profit to execute a trade (in token units)
-    gas_price_multiplier: float  # Multiplier for gas price estimation (buffer)
-    max_slippage: float  # Maximum allowed slippage percentage
-    max_position_size: float  # Maximum position size in ETH
-    trade_interval: int  # Time between trades in seconds
+    price_difference_ratio: float  # Price difference ratio
+    min_collateral: int  # Minimum collateral
+    max_collateral: int  # Maximum collateral
+    trade_interval: int  # Trading interval in seconds
 
     # Foil contract address
     foil_address: str  # Address of the Foil contract
+    epoch_id: int  # Epoch ID
 
     # Discord configuration
     discord_bot_token: Optional[str] = None
@@ -39,16 +40,16 @@ class ArbitrageConfig(BaseConfig):
         # Network and wallet
         rpc_url = ConfigManager.get_required_str("NETWORK_RPC_URL")
         wallet_pk = ConfigManager.get_required_str("WALLET_PK")
-
-        # Trading parameters
-        min_profit_threshold = ConfigManager.get_float("MIN_PROFIT_THRESHOLD", 0.01)
-        gas_price_multiplier = ConfigManager.get_float("GAS_PRICE_MULTIPLIER", 1.2)
-        max_slippage = ConfigManager.get_float("MAX_SLIPPAGE", 0.5)  # 0.5%
-        max_position_size = ConfigManager.get_float("MAX_POSITION_SIZE", 1.0)  # 1 ETH
-        trade_interval = ConfigManager.get_int("TRADE_INTERVAL", 60)  # 60 seconds
+        foil_api_url = ConfigManager.get_required_str("FOIL_API_URL")
 
         # Foil contract address
-        foil_address = Web3.to_checksum_address(ConfigManager.get_required_str("FOIL_ADDRESS"))
+        foil_address = ConfigManager.get_checksum_address("FOIL_ADDRESS")
+        epoch_id = ConfigManager.get_int("EPOCH_ID", 1)
+        # Trading parameters
+        price_difference_ratio = ConfigManager.get_float("PRICE_DIFFERENCE_RATIO", 0.2)
+        min_collateral = ConfigManager.get_int("MIN_COLLATERAL", 100000000000000000)  # 0.1 ETH default
+        max_collateral = ConfigManager.get_int("MAX_COLLATERAL", 1000000000000000000)  # 1 ETH default
+        trade_interval = ConfigManager.get_int("BOT_RUN_INTERVAL", 300)  # Default to 5 minutes
 
         # Discord configuration
         discord_bot_token = ConfigManager.get_optional_str("DISCORD_BOT_TOKEN")
@@ -58,19 +59,13 @@ class ArbitrageConfig(BaseConfig):
         return cls(
             rpc_url=rpc_url,
             wallet_pk=wallet_pk,
-            min_profit_threshold=min_profit_threshold,
-            gas_price_multiplier=gas_price_multiplier,
-            max_slippage=max_slippage,
-            max_position_size=max_position_size,
+            foil_api_url=foil_api_url,
+            price_difference_ratio=price_difference_ratio,
+            min_collateral=min_collateral,
+            max_collateral=max_collateral,
             trade_interval=trade_interval,
             foil_address=foil_address,
+            epoch_id=epoch_id,
             discord_bot_token=discord_bot_token,
             discord_channel_id=discord_channel_id,
         )
-
-    @classmethod
-    def get_config(cls) -> "ArbitrageConfig":
-        """Get a singleton instance of the config"""
-        if not hasattr(cls, "_instance"):
-            cls._instance = cls.from_env()
-        return cls._instance

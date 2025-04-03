@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any, ClassVar, Dict, Optional, Type, TypeVar
 
 from dotenv import find_dotenv, load_dotenv
@@ -21,6 +22,12 @@ class BaseConfig:
         return cls._instance
 
     @classmethod
+    def reload_config(cls: Type[T]) -> T:
+        """Force reload the configuration from environment"""
+        cls._instance = None
+        return cls.get_config()
+
+    @classmethod
     def from_env(cls: Type[T]) -> T:
         """Load configuration from environment variables.
         To be implemented by subclasses."""
@@ -33,11 +40,33 @@ class ConfigManager:
     @staticmethod
     def load_env(env_path: Optional[str] = None) -> None:
         """Load environment variables from .env file"""
-        # If no specific path is provided, check for a local .env file
-        if not env_path and os.path.exists(".env"):
-            env_path = ".env"
+        if env_path:
+            # If a specific path is provided, use it
+            load_dotenv(env_path, override=True)
+            return
 
-        load_dotenv(env_path or find_dotenv(), override=True)
+        # Get the caller's module path
+        import inspect
+
+        caller_frame = inspect.stack()[1]
+        caller_module = inspect.getmodule(caller_frame[0])
+        if caller_module:
+            module_path = Path(caller_module.__file__)
+
+            # Extract the package name from the module path
+            # Module path will be like ".../foil-bots/loom_bot/src/bot/config.py"
+            # We want to find "loom_bot" or "garb_bot"
+            parts = module_path.parts
+            for i, part in enumerate(parts):
+                if part in ["loom_bot", "garb_bot"]:
+                    package_root = Path(*parts[: i + 1])
+                    env_file = package_root / ".env"
+                    if env_file.exists():
+                        load_dotenv(str(env_file), override=True)
+                        return
+
+        # Fallback to finding any .env file in the project
+        load_dotenv(find_dotenv(), override=True)
 
     @staticmethod
     def get_required_str(key: str, error_msg: Optional[str] = None) -> str:

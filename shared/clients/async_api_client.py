@@ -43,12 +43,14 @@ class AsyncFoilAPIClient:
                 $from: Int!
                 $to: Int!
                 $interval: Int!
+                $trailingAvgTime: Int!
             ) {
                 resourceTrailingAverageCandles(
                   slug: $slug
                   from: $from
                   to: $to
                   interval: $interval
+                  trailingAvgTime: $trailingAvgTime
                 ) {
                   timestamp
                   close
@@ -59,17 +61,20 @@ class AsyncFoilAPIClient:
 
         now = int(time.time())
         trailing_time = 5 * 60  # 5 minutes in seconds
+        trailing_avg_time = 28 * 24 * 60 * 60  # 28 days in seconds
 
         variables = {
             "slug": resource_slug,
             "from": now - trailing_time,
             "to": now,
             "interval": trailing_time,
+            "trailingAvgTime": trailing_avg_time,
         }
 
         self.logger.info(f"Fetching trailing average for {resource_slug}")
         self.logger.info(
-            f"Query variables: from={variables['from']}, to={variables['to']}, interval={variables['interval']}"
+            f"Query variables: from={variables['from']}, to={variables['to']}, "
+            f"interval={variables['interval']}, trailingAvgTime={variables['trailingAvgTime']}"
         )
 
         try:

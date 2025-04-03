@@ -5,12 +5,12 @@ Arbitrage Bot - A bot for cryptocurrency arbitrage on the foil contract.
 import asyncio
 import logging
 from datetime import datetime
-
-from web3 import Web3
+from decimal import Decimal
 
 from shared.clients.discord_client import DiscordNotifier
 from shared.utils.async_web3_utils import create_async_web3_provider
 
+from .api_client import GarbApiClient
 from .arb import ArbitrageLogic
 from .config import ArbitrageConfig
 from .foil import Foil
@@ -22,8 +22,8 @@ class ArbitrageBot:
 
     def __init__(self):
         """Initialize the arbitrage bot"""
-        # Load configuration
-        self.config = ArbitrageConfig.get_config()
+        # Load configuration - use reload_config to ensure fresh values
+        self.config = ArbitrageConfig.reload_config()
 
         # Setup logging
         self.logger = self._setup_logger()
@@ -35,14 +35,11 @@ class ArbitrageBot:
         # Initialize Discord client
         self.discord = DiscordNotifier.get_instance("ArbitrageBot", self.config)
 
-        # Load account address - no Web3 instance needed for this
-        self.account_address = Web3.to_checksum_address(self.config.wallet_pk)
-        self.logger.info(f"Using wallet address: {self.account_address}")
-
         # These will be initialized in the start method
         self.foil = None
         self.position = None
         self.arb_logic = None
+        self.api_client = None
 
         self.logger.info("Arbitrage Bot initialization complete")
         self.discord.send_message("🤖 Arbitrage Bot initialized and ready!")
@@ -50,13 +47,20 @@ class ArbitrageBot:
     def _setup_logger(self) -> logging.Logger:
         """Initialize logging configuration"""
         logger = logging.getLogger("ArbitrageBot")
-        logger.setLevel(logging.INFO)
 
-        # Create console handler with formatting
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+        # Only add handlers if the logger doesn't already have any
+        # This prevents duplicate logging
+        if not logger.handlers:
+            logger.setLevel(logging.INFO)
+
+            # Create console handler with formatting
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
+            # Prevent propagation to the root logger to avoid duplicate logs
+            logger.propagate = False
 
         return logger
 
@@ -68,8 +72,18 @@ class ArbitrageBot:
         # Initialize async web3 provider
         self.w3 = await create_async_web3_provider(self.config.rpc_url, self.logger)
 
+        # Load account address - no Web3 instance needed for this
+        self.account_address = self.w3.eth.account.from_key(self.config.wallet_pk).address
+        self.logger.info(f"Using wallet address: {self.account_address}")
+
+        # Initialize API client
+        self.api_client = GarbApiClient(self.config.foil_api_url)
+
         # Initialize components that need web3
         self.foil = Foil(self.w3)
+        # Initialize the foil contract data asynchronously
+        await self.foil.initialize()
+
         self.position = Position(self.account_address, self.foil, self.w3)
         self.arb_logic = ArbitrageLogic(self.foil, self.position)
 
@@ -78,9 +92,10 @@ class ArbitrageBot:
                 start_time = datetime.now()
                 self.logger.info(f"Starting Bot Run - Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-                # Get all data concurrently - trailing price, pool price, and position
-                avg_price_task = asyncio.create_task(self.foil.get_avg_trailing_price())
-                pool_price_task = asyncio.create_task(self.foil.get_current_pool_price())
+                # Get all data concurrently - trailing price from API, pool price from contract, and position
+                # Use API client for trailing average price
+                avg_price_task = asyncio.create_task(self.api_client.get_trailing_average("ethereum-gas"))
+                pool_price_task = asyncio.create_task(self.foil.get_current_price_d18())
                 position_task = asyncio.create_task(self.position.hydrate_current_position())
 
                 # Wait for all tasks to complete
@@ -88,10 +103,10 @@ class ArbitrageBot:
                     avg_price_task, pool_price_task, position_task
                 )
 
-                self.logger.info(f"Price data - Avg: {avg_trailing_price}, Pool: {current_pool_price}")
+                self.logger.info(f"Price data - API Avg: {avg_trailing_price} gwei, Pool: {current_pool_price}")
 
-                # Run arbitrage logic
-                result = await self.arb_logic.run(avg_trailing_price, current_pool_price)
+                # Run arbitrage logic with the converted trailing price
+                result = await self.arb_logic.run(Decimal(avg_trailing_price), Decimal(current_pool_price))
 
                 if result["performed_arb"]:
                     self.discord.send_message(

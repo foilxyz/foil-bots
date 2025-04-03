@@ -15,8 +15,8 @@ from .strategy import BotStrategy
 
 class LoomBot:
     def __init__(self):
-        # Load configuration
-        self.config = BotConfig.get_config()
+        # Load configuration - use reload_config to ensure fresh values
+        self.config = BotConfig.reload_config()
 
         # Setup logging
         self.logger = self._setup_logger()
