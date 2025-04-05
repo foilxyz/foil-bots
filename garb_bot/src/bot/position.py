@@ -18,6 +18,7 @@ from .foil import Foil
 class CurrentPosition(TypedDict):
     kind: int
     collateral_amount: int
+    direction: str  # "LONG" / "SHORT" / "NONE"
 
 
 class Position:
@@ -62,14 +63,10 @@ class Position:
         position_data = await self.foil.contract.functions.getPosition(self.position_id).call()
         (_, kind, _, collateral_amount, _, _, _, _, _, _) = position_data
 
+        kind_display = {0: "None", 1: "LP", 2: "Trader"}[kind]
+
         self.logger.info(
-            f"""
-                ----------------------
-                | Position Details   |
-                ----------------------
-                ID:                {self.position_id}
-                Kind:              {kind}
-                Collateral Amount: {collateral_amount}"""
+            f"Position Details - ID: {self.position_id}, Kind: {kind_display}, Collateral Amount: {collateral_amount}"
         )
 
         self.current = {
@@ -145,21 +142,14 @@ class Position:
         required_collateral, fill_price = quote
         return required_collateral, fill_price
 
-    async def create_trader_position(
-        self, size: int, delta_collateral_limit: int, deadline: int, simulate: bool = False
-    ) -> Optional[Dict[str, Any]]:
+    async def create_trader_position(self, size: int, delta_collateral_limit: int, deadline: int):
         """
-        Create a new trader position with optional simulation
+        Create a new trader position
 
         Args:
             size: The size of the position to create
             delta_collateral_limit: The limit for collateral changes
             deadline: The deadline for the transaction
-            simulate: Whether to simulate the transaction instead of executing it
-
-        Returns:
-            If simulate is True, returns a dict with position details from the event
-            If simulate is False, returns None after executing the transaction
         """
         epoch_id = self.foil.epoch["epoch_id"]
         collateral_asset = self.foil.market_params["collateral_asset"]
@@ -169,7 +159,7 @@ class Position:
             self.account_address, self.foil.contract.address
         ).call()
 
-        # If allowance is less than the required collateral, simulate/execute approval
+        # If allowance is less than the required collateral, execute approval
         if current_allowance < delta_collateral_limit:
             self.logger.info(f"Approving {delta_collateral_limit} collateral to Foil contract")
 
@@ -187,53 +177,21 @@ class Position:
         else:
             self.logger.info(f"Sufficient allowance already exists: {current_allowance}")
 
-        if simulate:
-            # Simulate the position creation
-            result = await simulate_async_transaction(
-                self.w3,
-                self.foil.contract.functions.createTraderPosition,
-                self.account_address,
-                self.logger,
-                epoch_id,
-                size,
-                delta_collateral_limit,
-                deadline,
-            )
+        # Execute the position creation
+        await send_async_transaction(
+            self.w3,
+            self.foil.contract.functions.createTraderPosition,
+            self.account_address,
+            self.pk,
+            self.logger,
+            "ARBITRAGE: Create Trader Position",
+            epoch_id,
+            size,
+            delta_collateral_limit,
+            deadline,
+        )
 
-            # Extract and log position details from simulation result
-            if result and "events" in result:
-                for event in result["events"]:
-                    if event.get("event") == "PositionCreated":
-                        position_details = event.get("args", {})
-                        self.logger.info(
-                            f"""
-                            ----------------------
-                            | Simulated Position |
-                            ----------------------
-                            Position ID:        {position_details.get('positionId')}
-                            Epoch ID:           {position_details.get('epochId')}
-                            Size:               {position_details.get('size')}
-                            Collateral:         {position_details.get('collateralAmount')}
-                            Fill Price:         {position_details.get('fillPrice')}
-                            """
-                        )
-
-            return result
-        else:
-            # Execute the position creation
-            await send_async_transaction(
-                self.w3,
-                self.foil.contract.functions.createTraderPosition,
-                self.account_address,
-                self.pk,
-                self.logger,
-                "ARBITRAGE: Create Trader Position",
-                epoch_id,
-                size,
-                delta_collateral_limit,
-                deadline,
-            )
-            return None
+        await self.hydrate_current_position()
 
     async def find_maximum_viable_size(
         self, initial_size: int, avg_trailing_price: Decimal, available_collateral: int
@@ -286,7 +244,7 @@ class Position:
 
                 # Calculate price difference ratio
                 price_diff = abs(fill_price_decimal - avg_trailing_price)
-                price_ratio = price_diff / avg_trailing_price
+                price_ratio = price_diff / fill_price_decimal
 
                 self.logger.info(
                     f"Size {test_size} gives price difference ratio {price_ratio} vs threshold {config.price_difference_ratio}"

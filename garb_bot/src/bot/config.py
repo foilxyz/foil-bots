@@ -31,6 +31,8 @@ class ArbitrageConfig(BaseConfig):
     discord_bot_token: Optional[str] = None
     discord_channel_id: Optional[str] = None
 
+    execute_arbitrage: bool = False
+
     @classmethod
     def from_env(cls) -> "ArbitrageConfig":
         """Load configuration from environment variables"""
@@ -38,22 +40,24 @@ class ArbitrageConfig(BaseConfig):
         ConfigManager.load_env()
 
         # Network and wallet
-        rpc_url = ConfigManager.get_required_str("NETWORK_RPC_URL")
-        wallet_pk = ConfigManager.get_required_str("WALLET_PK")
-        foil_api_url = ConfigManager.get_required_str("FOIL_API_URL")
+        rpc_url = ConfigManager.get_required_str("GARB_BOT_NETWORK_RPC_URL")
+        wallet_pk = ConfigManager.get_required_str("GARB_BOT_WALLET_PK")
+        foil_api_url = ConfigManager.get_required_str("GARB_BOT_FOIL_API_URL")
 
         # Foil contract address
-        foil_address = ConfigManager.get_checksum_address("FOIL_ADDRESS")
-        epoch_id = ConfigManager.get_int("EPOCH_ID", 1)
+        foil_address = ConfigManager.get_checksum_address("GARB_BOT_FOIL_ADDRESS")
+        epoch_id = ConfigManager.get_int("GARB_BOT_EPOCH_ID", 1)
         # Trading parameters
-        price_difference_ratio = ConfigManager.get_float("PRICE_DIFFERENCE_RATIO", 0.2)
-        min_collateral = ConfigManager.get_int("MIN_COLLATERAL", 100000000000000000)  # 0.1 ETH default
-        max_collateral = ConfigManager.get_int("MAX_COLLATERAL", 1000000000000000000)  # 1 ETH default
-        trade_interval = ConfigManager.get_int("BOT_RUN_INTERVAL", 300)  # Default to 5 minutes
+        price_difference_ratio = ConfigManager.get_float("GARB_BOT_PRICE_DIFFERENCE_RATIO", 0.2)
+        min_collateral = ConfigManager.get_int("GARB_BOT_MIN_COLLATERAL", 100000000000000000)  # 0.1 ETH default
+        max_collateral = ConfigManager.get_int("GARB_BOT_MAX_COLLATERAL", 1000000000000000000)  # 1 ETH default
+        trade_interval = ConfigManager.get_int("GARB_BOT_BOT_RUN_INTERVAL", 300)  # Default to 5 minutes
 
         # Discord configuration
-        discord_bot_token = ConfigManager.get_optional_str("DISCORD_BOT_TOKEN")
-        discord_channel_id = ConfigManager.get_optional_str("DISCORD_CHANNEL_ID")
+        discord_bot_token = ConfigManager.get_optional_str("GARB_BOT_DISCORD_BOT_TOKEN")
+        discord_channel_id = ConfigManager.get_optional_str("GARB_BOT_DISCORD_CHANNEL_ID")
+
+        execute_arbitrage = ConfigManager.get_bool("GARB_BOT_EXECUTE_ARBITRAGE", False)
 
         # Create and return config
         return cls(
@@ -68,4 +72,5 @@ class ArbitrageConfig(BaseConfig):
             epoch_id=epoch_id,
             discord_bot_token=discord_bot_token,
             discord_channel_id=discord_channel_id,
+            execute_arbitrage=execute_arbitrage,
         )

@@ -67,7 +67,13 @@ class ArbitrageBot:
     async def start(self):
         """Start the arbitrage bot"""
         self.logger.info(f"Starting bot with {self.config.trade_interval} second interval...")
-        self.discord.send_message(f"🚀 Bot started with {self.config.trade_interval} second interval")
+        self.discord.send_message(
+            f"🤖 **Arbitrage Bot is Live!** 🤖\n\n"
+            f"• Trade Interval: {self.config.trade_interval}s\n"
+            f"• Ready to hunt for opportunities! 🎯\n"
+            f"• Let's make some profits! 💰\n\n"
+            f"Stay tuned for updates! 📊"
+        )
 
         # Initialize async web3 provider
         self.w3 = await create_async_web3_provider(self.config.rpc_url, self.logger)
@@ -85,7 +91,7 @@ class ArbitrageBot:
         await self.foil.initialize()
 
         self.position = Position(self.account_address, self.foil, self.w3)
-        self.arb_logic = ArbitrageLogic(self.foil, self.position)
+        self.arb_logic = ArbitrageLogic(self.foil, self.position, self.discord)
 
         while True:
             try:
@@ -105,17 +111,8 @@ class ArbitrageBot:
 
                 self.logger.info(f"Price data - API Avg: {avg_trailing_price} gwei, Pool: {current_pool_price}")
 
-                # Run arbitrage logic with the converted trailing price
-                result = await self.arb_logic.run(Decimal(avg_trailing_price), Decimal(current_pool_price))
-
-                if result["performed_arb"]:
-                    self.discord.send_message(
-                        f"✅ Successfully executed arbitrage:\n"
-                        f"- Price Difference: {result['price_difference']}\n"
-                        f"- Profit: {result.get('profit', 'N/A')}"
-                    )
-                else:
-                    self.logger.info(f"No arbitrage performed: {result['reason']}")
+                # run arbitrage logic
+                await self.arb_logic.run(Decimal(avg_trailing_price), Decimal(current_pool_price))
 
                 end_time = datetime.now()
                 duration = (end_time - start_time).total_seconds()
@@ -125,11 +122,23 @@ class ArbitrageBot:
 
             except KeyboardInterrupt:
                 self.logger.info("Bot stopped by user")
-                self.discord.send_message("⛔ Bot stopped by user")
+                self.discord.send_message(
+                    f"⛔ **Bot Stopped by User** ⛔\n\n"
+                    f"• Time to take a break! ☕\n"
+                    f"• Thanks for the ride! 🎢\n"
+                    f"• See you next time! 👋\n\n"
+                    f"All positions and profits are safe! 🔒"
+                )
                 raise
 
             except Exception as e:
                 self.logger.error(f"Error during bot execution: {str(e)}")
-                self.discord.send_message(f"❌ **Error**: {str(e)}")
+                self.discord.send_message(
+                    f"❌ **Error Alert!** ❌\n\n"
+                    f"Something unexpected happened:\n"
+                    f"```{str(e)}```\n\n"
+                    f"Don't worry, I'll keep trying! 💪\n"
+                    f"Next run in {self.config.trade_interval}s"
+                )
                 self.logger.info(f"Next run in {self.config.trade_interval}s")
                 await asyncio.sleep(self.config.trade_interval)
