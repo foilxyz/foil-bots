@@ -2,11 +2,11 @@ import asyncio
 import logging
 from datetime import datetime
 
-from web3 import Web3
+from shared.clients.discord_client import DiscordNotifier
+from shared.utils.web3_utils import create_web3_provider
 
 from .api_client import FoilAPIClient
 from .config import BotConfig
-from .discord_client import DiscordNotifier
 from .exceptions import SkipBotRun
 from .foil import Foil
 from .position import Position
@@ -15,15 +15,15 @@ from .strategy import BotStrategy
 
 class LoomBot:
     def __init__(self):
-        # Load configuration
-        self.config = BotConfig.get_config()
+        # Load configuration - use reload_config to ensure fresh values
+        self.config = BotConfig.reload_config()
 
         # Setup logging
         self.logger = self._setup_logger()
         self.logger.info("Initializing Loom Bot...")
 
         # Initialize Web3 connection
-        self.w3 = self._init_web3()
+        self.w3 = create_web3_provider(self.config.rpc_url, self.logger)
 
         # Initialize API client
         self.api_client = FoilAPIClient(self.config.foil_api_url)
@@ -32,14 +32,13 @@ class LoomBot:
         self.foil = Foil(self.w3)
 
         # Initialize Discord notifier
-        self.discord = DiscordNotifier.get_instance()
+        self.discord = DiscordNotifier.get_instance("LoomBot", self.config)
 
         # Load account address
         self.account_address = self.w3.eth.account.from_key(self.config.wallet_pk).address
         self.logger.info(f"Using wallet address: {self.account_address}")
 
         # Load position
-
         self.position = Position(self.account_address, self.foil, self.w3)
 
         self.logger.info("Bot initialization complete")
@@ -59,20 +58,6 @@ class LoomBot:
         logger.addHandler(handler)
 
         return logger
-
-    def _init_web3(self) -> Web3:
-        """Initialize Web3 connection"""
-        self.logger.info(f"Connecting to RPC: {self.config.rpc_url}")
-        w3 = Web3(Web3.HTTPProvider(self.config.rpc_url))
-
-        if not w3.is_connected():
-            raise ConnectionError("Failed to connect to Web3 provider")
-
-        self.logger.info(f"Connected to network: {w3.eth.chain_id}")
-        return w3
-
-    def _init_foil(self) -> Foil:
-        """Initialize Web3 contract instance"""
 
     async def start(self):
         """Start the bot"""

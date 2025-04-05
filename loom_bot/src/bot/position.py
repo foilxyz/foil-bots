@@ -3,9 +3,11 @@ from typing import TypedDict
 
 from web3 import Web3
 
+from shared.clients.discord_client import DiscordNotifier
+from shared.utils.web3_utils import send_transaction, simulate_transaction, tick_to_sqrt_price_x96
+
 from .config import BotConfig
 from .foil import Foil
-from .utils import send_transaction, simulate_transaction, tick_to_sqrt_price_x96
 
 
 class CurrentPosition(TypedDict):
@@ -25,10 +27,8 @@ class Position:
         self.pk = BotConfig.get_config().wallet_pk
         self.foil = foil
 
-        # Notify Discord about the new position
-        from .discord_client import DiscordNotifier
-
-        self.discord = DiscordNotifier.get_instance()
+        # Initialize Discord notifier
+        self.discord = DiscordNotifier.get_instance("LoomBot", BotConfig.get_config())
 
         self.hydrate_current_position()
 

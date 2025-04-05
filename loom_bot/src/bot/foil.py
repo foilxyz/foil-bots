@@ -4,7 +4,9 @@ from typing import TypedDict
 from web3 import Web3
 from web3.contract import Contract
 
-from ..abis import POSITION_MANAGER_ABI, abi_loader
+from shared.abis import POSITION_MANAGER_ABI, abi_loader
+from shared.clients.discord_client import DiscordNotifier
+
 from .config import BotConfig
 
 
@@ -25,17 +27,16 @@ class Foil:
     def __init__(self, w3: Web3):
         self.w3 = w3
         self.logger = logging.getLogger("LoomBot")
+        self.config = BotConfig.get_config()
 
-        foil_address = BotConfig.get_config().foil_address
+        foil_address = self.config.foil_address
         self.contract = w3.eth.contract(address=foil_address, abi=abi_loader.get_abi("foil"))
         self.logger.info(f"Loaded foil contract at {foil_address}")
 
         self._hydrate_market_and_epoch()
 
         # Send message to Discord with foil address and epoch id
-        from .discord_client import DiscordNotifier
-
-        discord = DiscordNotifier.get_instance()
+        discord = DiscordNotifier.get_instance("LoomBot", self.config)
         discord.send_message(
             f"🧠 **Foil Market Connected**\n- Contract: {foil_address}\n- Epoch ID: {self.epoch['epoch_id']}"
         )

@@ -1,27 +1,34 @@
 [tool.poetry]
-name = "loom-bot"
+name = "foil-bots"
 version = "0.1.0"
-description = "A smart LP."
+description = "A monorepo for Web3 trading and liquidity provision bots"
 authors = ["sunny <sunny@foil.xyz>"]
+readme = "README.md"
 packages = [
-    { include = "src" }
+    { include = "shared" },
+    { include = "loom_bot" },
+    { include = "garb_bot" }
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.8"
 web3 = "^6.15.1"
 python-dotenv = "^1.0.1"
-gql = {extras = ["requests"], version = "^3.5.0"}
-requests = "^2.31.0"
-typing-extensions = "^4.10.0"
 discord-py = "^2.5.0"
+aiohttp = "^3.9.3"
+gql = {extras = ["aiohttp", "requests"], version = "^3.5.0"}
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.3.0"
 ruff = "^0.5.0"
 
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry.scripts]
-bot = "src.bot.__main__:main"
+loom-bot = "loom_bot.src.bot.__main__:main"
+garb-bot = "garb_bot.src.bot.__main__:main"
 
 [tool.black]
 line-length = 120

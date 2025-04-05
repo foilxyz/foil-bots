@@ -1,22 +1,53 @@
-# Loom Bot
+# FOIL Bots Monorepo
 
-A Web3 bot for automated market making on the FOIL protocol, built with Python.
+A monorepo containing Web3 bots for automated trading and liquidity provision.
 
-## Features
+## Projects
 
-- Automated position management for FOIL protocol
-- Real-time price monitoring and position optimization
-- Discord notifications for important events and errors
-- Configurable trading parameters
-- Support for both LP and trader positions (trader: coming soon)
+This monorepo contains the following projects:
 
-## Prerequisites
+### 1. Loom Bot
 
-- Python 3.8 or higher
-- Web3.py
-- Discord.py
-- Access to an Ethereum node (e.g., Infura)
-- Discord bot token and channel ID
+A bot for automated liquidity provision on the FOIL protocol. It monitors market prices and optimizes LP positions based on market conditions.
+
+### 2. Arbitrage Bot
+
+A bot for cryptocurrency arbitrage across different DEXes. It scans multiple exchanges for price differences and executes trades when profitable opportunities are found.
+
+## Shared Components
+
+Both bots share common functionality through the `shared` directory:
+
+- **Config Management**: Standardized configuration loading from environment variables
+- **Discord Integration**: Real-time notifications and monitoring
+- **Web3 Utilities**: Transaction handling, simulation, and blockchain interaction
+
+## Directory Structure
+
+```
+foil-bots/
+├── shared/                  # Shared modules
+│   ├── clients/             # Shared client implementations
+│   │   └── discord_client.py
+│   ├── config/              # Configuration management
+│   │   └── config_manager.py
+│   └── utils/               # Utility functions
+│       └── web3_utils.py
+├── loom-bot/                # FOIL LP Bot
+│   ├── src/
+│   │   └── bot/
+│   │       ├── strategy.py
+│   │       ├── position.py
+│   │       └── ...
+│   └── .env.example
+└── arbitrage-bot/           # Arbitrage Bot
+    ├── src/
+    │   └── bot/
+    │       ├── strategy.py
+    │       ├── markets.py
+    │       └── ...
+    └── .env.example
+```
 
 ## Installation
 
@@ -24,125 +55,81 @@ A Web3 bot for automated market making on the FOIL protocol, built with Python.
 
 ```bash
 git clone <repository-url>
+cd foil-bots
+```
+
+2. Install Poetry if you haven't already:
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+3. Install dependencies using Poetry:
+
+```bash
+# Install root project dependencies
+poetry install
+
+# For loom-bot only
 cd loom-bot
+poetry install
+
+# For arbitrage-bot only
+cd ../arbitrage-bot
+poetry install
 ```
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Create a `.env` file based on `.env.example`:
-
-```bash
-cp .env.example .env
-```
-
-4. Configure your environment variables in `.env`:
-
-```env
-NETWORK_RPC_URL="https://mainnet.infura.io/v3/YOUR_KEY"
-
-# Contract addresses
-FOIL_ADDRESS="0x..."
-
-# Trading parameters
-RISK_SPREAD_SPACING_WIDTH=5
-LP_RANGE_WIDTH=20
-MIN_POSITION_SIZE=100000000000000000
-MAX_POSITION_SIZE=200000000000000000
-TRAILING_AVERAGE_DAYS=28
-
-# Wallet PK
-WALLET_PK="0x..."
-
-# FOIL API URL
-FOIL_API_URL="https://api.staging.foil.xyz"
-
-# Bot run interval in seconds
-BOT_RUN_INTERVAL=60
-
-# Discord
-DISCORD_BOT_TOKEN="..."
-DISCORD_CHANNEL_ID="..."
-```
-
-## Discord Bot Setup
-
-1. Create a new Discord application at [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a bot for your application
-3. Enable the "Message Content Intent" in the Bot section
-4. Copy the bot token and add it to your `.env` file
-5. Invite the bot to your server with proper permissions:
-   - Send Messages
-   - Read Message History
-6. Get your channel ID (right-click channel → Copy ID) and add it to your `.env` file
-
-## Usage
-
-Run the bot:
-
-```bash
-python -m src.bot
-```
-
-The bot will:
-
-- Connect to the FOIL protocol
-- Monitor market prices
-- Manage positions based on configured strategy
-- Send notifications to Discord for important events
-
-## Discord Notifications
-
-The bot sends notifications for:
-
-- Bot initialization and startup
-- Price updates
-- Position creation and closure
-- Errors and warnings
-- Bot shutdown
 
 ## Configuration
 
-Key configuration parameters in `.env`:
+Each bot has its own `.env` file for configuration. Copy the example files and customize:
 
-- `NETWORK_RPC_URL`: Your Ethereum node URL
-- `FOIL_ADDRESS`: FOIL contract address
-- `WALLET_PK`: Your wallet's private key
-- `RISK_SPREAD_SPACING_WIDTH`: Width of risk spread spacing
-- `LP_RANGE_WIDTH`: Width of LP range
-- `MIN_POSITION_SIZE`: Minimum position size in wei
-- `MAX_POSITION_SIZE`: Maximum position size in wei
-- `TRAILING_AVERAGE_DAYS`: Number of days for trailing average
-- `BOT_RUN_INTERVAL`: Bot execution interval in seconds
-- `DISCORD_BOT_TOKEN`: Your Discord bot token
-- `DISCORD_CHANNEL_ID`: Target Discord channel ID
+```bash
+# For Loom Bot
+cp loom-bot/.env.example loom-bot/.env
 
-## Error Handling
+# For Arbitrage Bot
+cp arbitrage-bot/.env.example arbitrage-bot/.env
+```
 
-The bot includes comprehensive error handling:
+## Running the Bots
 
-- Transaction simulation before execution
-- Position transition checks
-- Network connection monitoring
-- Discord notifications for errors
+### Loom Bot
 
-## Security
+```bash
+# From the root directory
+poetry run loom-bot
 
-- Never share your private key or bot token
-- Keep your `.env` file secure and never commit it to version control
-- Use environment variables for sensitive data
-- Consider using a dedicated wallet for the bot
+# Or from the loom-bot directory
+cd loom-bot
+poetry run loom-bot
+```
 
-## Contributing
+### Arbitrage Bot
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+```bash
+# From the root directory
+poetry run arbitrage-bot
+
+# Or from the arbitrage-bot directory
+cd arbitrage-bot
+poetry run arbitrage-bot
+```
+
+## Discord Setup
+
+Both bots can send notifications to Discord. To set this up:
+
+1. Create a Discord bot at the [Discord Developer Portal](https://discord.com/developers/applications)
+2. Add the bot to your server
+3. Get the bot token and channel ID
+4. Add these to your `.env` files
+
+## Development
+
+To add a new shared component:
+
+1. Add the code to the appropriate directory in `shared/`
+2. Import it in your bot code using the pattern: `from shared.module.file import Component`
 
 ## License
 
@@ -150,4 +137,4 @@ MIT
 
 ## Disclaimer
 
-This bot is for educational purposes only. Use at your own risk. The authors are not responsible for any financial losses incurred through the use of this bot.
+These bots are for educational purposes only. Use at your own risk. The authors are not responsible for any financial losses incurred through the use of these bots.
