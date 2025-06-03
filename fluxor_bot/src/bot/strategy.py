@@ -94,10 +94,6 @@ class FluxorStrategy:
             self.position.open_new_position(low_min_tick, low_max_tick)
             self.logger.info("✅ Low position created successfully")
 
-            # Wait a moment and refresh position state
-            time.sleep(2)
-            self.position.hydrate_current_position()
-
             # Create the high position
             self.logger.info("🚀 Creating high position (above prediction)...")
             self.position.open_new_position(high_min_tick, high_max_tick)
