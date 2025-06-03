@@ -7,7 +7,8 @@ readme = "README.md"
 packages = [
     { include = "shared" },
     { include = "loom_bot" },
-    { include = "garb_bot" }
+    { include = "garb_bot" },
+    { include = "fluxor_bot" }
 ]
 
 [tool.poetry.dependencies]
@@ -29,6 +30,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 loom-bot = "loom_bot.src.bot.__main__:main"
 garb-bot = "garb_bot.src.bot.__main__:main"
+fluxor-bot = "fluxor_bot.src.bot.__main__:main"
 
 [tool.black]
 line-length = 120
