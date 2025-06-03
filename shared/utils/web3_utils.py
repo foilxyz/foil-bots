@@ -37,6 +37,7 @@ def send_transaction(
     *args: Any,
     timeout: int = 600,
     poll_latency: int = 2,
+    gas_multiplier: float = 1.2,
     **kwargs: Any,
 ) -> TxReceipt:
     """
@@ -52,6 +53,7 @@ def send_transaction(
         *args: Variable arguments for contract function
         timeout: Transaction timeout in seconds
         poll_latency: Time between receipt checks in seconds
+        gas_multiplier: Gas multiplier for transaction (default 1.2 = 20% buffer)
         **kwargs: Additional transaction parameters
 
     Returns:
@@ -62,14 +64,25 @@ def send_transaction(
         gas_estimate = contract_fn(*args).estimate_gas({"from": account_address})
         base_fee = w3.eth.get_block("latest")["baseFeePerGas"]
         priority_fee = w3.eth.max_priority_fee
-        max_fee = base_fee + priority_fee * 2  # Dynamic buffer
+
+        # Adjust gas pricing for different networks
+        chain_id = w3.eth.chain_id
+        if chain_id == 8453:  # Base mainnet
+            # Base mainnet often needs higher priority fees
+            priority_fee = max(priority_fee, int(0.001 * 10**9))  # Minimum 0.001 gwei
+            max_fee = base_fee + priority_fee * 3  # Larger buffer for Base
+            logger.info(f"Base mainnet detected - Using higher gas: priority={priority_fee}, max={max_fee}")
+        else:
+            max_fee = base_fee + priority_fee * 2  # Standard buffer
+
+        logger.info(f"Gas estimate: {gas_estimate}, Base fee: {base_fee}, Priority fee: {priority_fee}")
 
         # Build transaction
         tx = contract_fn(*args).build_transaction(
             {
                 "from": account_address,
                 "nonce": w3.eth.get_transaction_count(account_address, "pending"),
-                "gas": int(gas_estimate * 1.2),  # 20% buffer
+                "gas": int(gas_estimate * gas_multiplier),
                 "maxFeePerGas": max_fee,
                 "maxPriorityFeePerGas": priority_fee,
                 **kwargs,
