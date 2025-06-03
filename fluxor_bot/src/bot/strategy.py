@@ -1,4 +1,5 @@
 import logging
+import time
 
 from shared.utils.web3_utils import price_to_tick, tick_to_price
 
@@ -38,17 +39,17 @@ class FluxorStrategy:
         if self.position.has_current_position():
             self.logger.info("Position already exists - TODO")
         else:
-            self.logger.info("No position found - lets go")
+            self.logger.info("No position found - checking with AI")
 
-            # Create theoretical positions based on AI prediction
+            # Create actual positions based on AI prediction
             if hasattr(self.foil, "ai_prediction") and self.foil.ai_prediction is not None:
-                self._create_theoretical_positions(self.foil.ai_prediction)
+                self._create_positions(self.foil.ai_prediction)
             else:
                 self.logger.warning("No AI prediction available, skipping position creation")
 
-    def _create_theoretical_positions(self, prediction_percentage: float) -> None:
-        """Create theoretical positions based on AI prediction percentage"""
-        self.logger.info(f"📊 Creating theoretical positions for {prediction_percentage}% prediction")
+    def _create_positions(self, prediction_percentage: float) -> None:
+        """Create actual positions based on AI prediction percentage"""
+        self.logger.info(f"📊 Creating both high and low positions for {prediction_percentage}% prediction")
 
         # Convert percentage to prediction value (65% -> 0.65)
         prediction_value = prediction_percentage / 100.0
@@ -62,37 +63,48 @@ class FluxorStrategy:
         risk_spread = int(self.config.risk_spread_spacing_width * tick_spacing)
         lp_range = int(self.config.lp_range_width * tick_spacing)
 
-        # Left side position (below prediction)
-        left_max_tick = prediction_tick - risk_spread
-        left_min_tick = left_max_tick - lp_range
+        # Calculate both positions around the prediction
+        # Low position (below prediction)
+        low_max_tick = prediction_tick - risk_spread
+        low_min_tick = low_max_tick - lp_range
 
-        # Right side position (above prediction)
-        right_min_tick = prediction_tick + risk_spread
-        right_max_tick = right_min_tick + lp_range
+        # High position (above prediction)
+        high_min_tick = prediction_tick + risk_spread
+        high_max_tick = high_min_tick + lp_range
 
-        # Convert ticks back to prices for display using shared utils
-        left_min_price = float(tick_to_price(left_min_tick))
-        left_max_price = float(tick_to_price(left_max_tick))
-        right_min_price = float(tick_to_price(right_min_tick))
-        right_max_price = float(tick_to_price(right_max_tick))
+        # Convert ticks back to prices for display
+        low_min_price = float(tick_to_price(low_min_tick))
+        low_max_price = float(tick_to_price(low_max_tick))
+        high_min_price = float(tick_to_price(high_min_tick))
+        high_max_price = float(tick_to_price(high_max_tick))
 
-        # Log theoretical positions
-        self.logger.info("🏗️ THEORETICAL POSITIONS:")
-        self.logger.info("📍 Left Position:")
-        self.logger.info(f"   Tick Range: {left_min_tick} to {left_max_tick}")
-        self.logger.info(f"   Price Range: {left_min_price:.4f} to {left_max_price:.4f}")
+        # Log the positions we're about to create
+        self.logger.info("🏗️ CREATING BOTH POSITIONS:")
+        self.logger.info("📍 Low Position (below prediction):")
+        self.logger.info(f"   Tick Range: {low_min_tick} to {low_max_tick}")
+        self.logger.info(f"   Price Range: {low_min_price:.4f} to {low_max_price:.4f}")
 
-        self.logger.info("📍 Right Position:")
-        self.logger.info(f"   Tick Range: {right_min_tick} to {right_max_tick}")
-        self.logger.info(f"   Price Range: {right_min_price:.4f} to {right_max_price:.4f}")
+        self.logger.info("📍 High Position (above prediction):")
+        self.logger.info(f"   Tick Range: {high_min_tick} to {high_max_tick}")
+        self.logger.info(f"   Price Range: {high_min_price:.4f} to {high_max_price:.4f}")
 
-    def calculate_position_size(self) -> float:
-        """Calculate appropriate position size based on risk management"""
-        return self.config.position_size
+        try:
+            # Create the low position first
+            self.logger.info("🚀 Creating low position (below prediction)...")
+            self.position.open_new_position(low_min_tick, low_max_tick)
+            self.logger.info("✅ Low position created successfully")
 
-    def get_tick_range(self, current_price: float) -> tuple[int, int]:
-        """Calculate optimal tick range for liquidity position"""
-        # This is now handled by _create_theoretical_positions
-        tick_spacing = self.foil.market_params["tick_spacing"]
-        current_tick = price_to_tick(current_price, tick_spacing)
-        return (current_tick - 100, current_tick + 100)  # Default range
+            # Wait a moment and refresh position state
+            time.sleep(2)
+            self.position.hydrate_current_position()
+
+            # Create the high position
+            self.logger.info("🚀 Creating high position (above prediction)...")
+            self.position.open_new_position(high_min_tick, high_max_tick)
+            self.logger.info("✅ High position created successfully")
+
+            self.logger.info("🎉 Both positions created successfully!")
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to create positions: {str(e)}")
+            raise

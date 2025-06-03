@@ -42,17 +42,34 @@ class BotConfig(BaseConfig):
     discord_channel_id: Optional[str] = None
 
     @classmethod
-    def get_config(cls) -> "BotConfig":
+    def from_env(cls) -> "BotConfig":
         """Load configuration from environment variables"""
+        # Load environment from top-level .env file
+        from pathlib import Path
+
+        # Get the absolute path to the top-level .env file
+        current_file = Path(__file__)  # This file is in fluxor_bot/src/bot/config.py
+        project_root = current_file.parent.parent.parent.parent  # Go up to foil-bots/
+        env_file = project_root / ".env"
+
+        if env_file.exists():
+            ConfigManager.load_env(str(env_file))
+        else:
+            # Fallback to default behavior if .env not found
+            ConfigManager.load_env()
+
         # Load market groups from environment
         market_groups_json = ConfigManager.get_required_str("FLUXOR_BOT_MARKET_GROUPS")
         market_groups_data = json.loads(market_groups_json)
         market_groups = [MarketGroupConfig.from_dict(group) for group in market_groups_data]
 
+        # OpenAI configuration
+        openai_api_key = ConfigManager.get_required_str("FLUXOR_BOT_OPENAI_API_KEY")
+
         # Load other configuration
-        rpc_url = ConfigManager.get_required_str("FLUXOR_BOT_RPC_URL")
+        rpc_url = ConfigManager.get_required_str("NETWORK_RPC_URL")
         wallet_pk = ConfigManager.get_required_str("FLUXOR_BOT_WALLET_PK")
-        bot_run_interval = ConfigManager.get_int("FLUXOR_BOT_BOT_RUN_INTERVAL", 600)
+        bot_run_interval = ConfigManager.get_int("FLUXOR_BOT_RUN_INTERVAL", 600)
         position_size = ConfigManager.get_float("FLUXOR_BOT_POSITION_SIZE", 1.0)
         risk_spread_spacing_width = ConfigManager.get_float("FLUXOR_BOT_RISK_SPREAD_SPACING_WIDTH", 0.1)
         lp_range_width = ConfigManager.get_float("FLUXOR_BOT_LP_RANGE_WIDTH", 0.2)
@@ -60,9 +77,6 @@ class BotConfig(BaseConfig):
         # Discord configuration
         discord_bot_token = ConfigManager.get_optional_str("DISCORD_BOT_TOKEN")
         discord_channel_id = ConfigManager.get_optional_str("DISCORD_CHANNEL_ID")
-
-        # OpenAI configuration
-        openai_api_key = ConfigManager.get_optional_str("FLUXOR_BOT_OPENAI_API_KEY")
 
         # Create and return the config
         return cls(

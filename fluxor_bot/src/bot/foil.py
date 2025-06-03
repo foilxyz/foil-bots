@@ -53,9 +53,6 @@ class Foil:
         """Get AI prediction likelihood for the claim statement"""
         try:
             config = BotConfig.get_config()
-            if not config.openai_api_key:
-                self.logger.warning("No OpenAI API key configured, skipping AI prediction")
-                return
 
             predictor = OpenAIPredictor(config.openai_api_key)
             likelihood = predictor.get_prediction_likelihood(self.epoch["claim_statement"])

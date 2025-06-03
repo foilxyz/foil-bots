@@ -107,30 +107,45 @@ class Position:
         if collateral_balance < deposit_amount:
             raise ValueError(f"Insufficient balance. Required: {deposit_amount}, Available: {collateral_balance}")
 
-        # Quote required token amounts for liquidity
+        # Quote required token amounts for liquidity (use slightly less amount for quote precision)
+        quote_amount = deposit_amount - int(1e6)  # Subtract 1 million wei for quote
         (token0_amount, token1_amount, _) = self.foil.contract.functions.quoteLiquidityPositionTokens(
             int(self.foil.epoch["epoch_id"]),
-            int(deposit_amount),
+            int(quote_amount),
             int(sqrt_price_x96_current),
             int(sqrt_price_x96_lower),
             int(sqrt_price_x96_upper),
         ).call()
 
         self.logger.info(
-            f"Quoted LP Position - Deposit: {deposit_amount}, " f"Token0: {token0_amount}, Token1: {token1_amount}"
+            f"Quoted LP Position - Quote Amount: {quote_amount}, Deposit Amount: {deposit_amount}, "
+            f"Token0: {token0_amount}, Token1: {token1_amount}"
         )
 
-        # Approve collateral spending
-        send_transaction(
-            self.w3,
-            self.foil.market_params["collateral_asset"].functions.approve,
-            self.account_address,
-            self.pk,
-            self.logger,
-            "FluxorBot: Approve Collateral",
-            self.foil.contract.address,
-            int(deposit_amount),
+        # Check current allowance before approving
+        current_allowance = (
+            self.foil.market_params["collateral_asset"]
+            .functions.allowance(self.account_address, self.foil.contract.address)
+            .call()
         )
+
+        self.logger.info(f"Current allowance: {current_allowance}, Required: {deposit_amount}")
+
+        # Only approve if current allowance is insufficient
+        if current_allowance < deposit_amount:
+            self.logger.info("Insufficient allowance, approving collateral spending...")
+            send_transaction(
+                self.w3,
+                self.foil.market_params["collateral_asset"].functions.approve,
+                self.account_address,
+                self.pk,
+                self.logger,
+                "FluxorBot: Approve Collateral",
+                self.foil.contract.address,
+                int(deposit_amount),
+            )
+        else:
+            self.logger.info("Sufficient allowance already exists, skipping approval")
 
         # Get current timestamp and add 30 minutes for deadline
         current_block = self.w3.eth.get_block("latest")
@@ -150,7 +165,23 @@ class Position:
         )
 
         try:
-            # Send transaction
+            # Simulate the transaction first to catch any issues
+            self.logger.info("Simulating liquidity position creation...")
+            simulation = simulate_transaction(
+                self.w3,
+                self.foil.contract.functions.createLiquidityPosition,
+                self.account_address,
+                self.logger,
+                position_params,
+            )
+
+            if not simulation["success"]:
+                raise ValueError(f"Transaction simulation failed: {simulation['error']}")
+
+            self.logger.info(f"Simulation successful. Estimated gas: {simulation['gas_estimate']}")
+
+            # Send transaction with higher gas and shorter timeout for Base mainnet
+            self.logger.info("Sending liquidity position creation transaction...")
             send_transaction(
                 self.w3,
                 self.foil.contract.functions.createLiquidityPosition,
@@ -159,6 +190,9 @@ class Position:
                 self.logger,
                 "FluxorBot: Create Liquidity Position",
                 position_params,
+                gas_multiplier=1.5,  # Use 150% of estimated gas instead of 120%
+                timeout=60,  # Reduce timeout to 1 minute to avoid hanging
+                poll_latency=3,  # Check every 3 seconds
             )
 
             # Get new position details
