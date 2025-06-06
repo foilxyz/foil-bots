@@ -1,19 +1,17 @@
-import asyncio
-import logging
 import sys
 
-from . import FluxorBot
+from . import run_bot
 
 
 def main():
+    """Run the bot once - ideal for cron jobs"""
     try:
-        bot = FluxorBot()
-        asyncio.run(bot.start())
+        run_bot()
     except KeyboardInterrupt:
-        logging.info("Bot stopped by user")
+        print("Bot stopped by user")
         sys.exit(0)
     except Exception as e:
-        logging.error(f"Bot stopped due to error: {str(e)}")
+        print(f"Bot failed with error: {str(e)}")
         sys.exit(1)
 
 

@@ -21,7 +21,7 @@ class CurrentPosition(TypedDict):
 
 class Position:
     def __init__(self, account_address: str, foil: Foil, w3: Web3):
-        self.logger = logging.getLogger(f"FluxorBot-{foil.market_config.market_id}")
+        self.logger = logging.getLogger("FluxorBot")
         self.account_address = account_address
         self.w3 = w3
         self.pk = BotConfig.get_config().wallet_pk
@@ -201,7 +201,7 @@ class Position:
             # Format message with position details
             if self.discord:
                 message = (
-                    f"🆕 **New Position Created** ({self.foil.market_config.market_id})\n"
+                    f"🆕 **New Position Created** ({self.foil.market_id})\n"
                     f"- Position ID: {self.position_id}\n"
                     f"- Tick Range: {self.current['tick_lower']} to {self.current['tick_upper']}\n"
                     f"- Liquidity: {self.current['liquidity']}\n"

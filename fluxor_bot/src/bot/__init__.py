@@ -33,79 +33,65 @@ class FluxorBot:
         self.market_manager = MarketManager(self.config, self.w3, self.account_address)
 
         # Log configuration summary
-        market_ids = self.market_manager.get_markets_summary()
-        total_markets = self.market_manager.get_market_count()
-
         self.logger.info("Configuration Summary:")
-        self.logger.info(f"- Total Markets: {total_markets}")
-        for market_id in market_ids:
-            self.logger.info(f"- Market: {market_id}")
+        self.logger.info(f"- API URL: {self.config.foil_api_url}")
+        self.logger.info(f"- Chain ID: {self.config.chain_id}")
+        self.logger.info(f"- Base Token: {self.config.base_token_name}")
 
         self.logger.info("Bot initialization complete")
 
         # Send initialization message to Discord
         if self.discord:
             init_message = "🤖 **Fluxor Bot Initialized**\n"
-            init_message += f"- Total Markets: {total_markets}\n"
-            for market_id in market_ids:
-                init_message += f"- Market: {market_id}\n"
-            init_message += f"- Run Interval: {self.config.bot_run_interval}s"
+            init_message += f"- API URL: {self.config.foil_api_url}\n"
+            init_message += f"- Chain ID: {self.config.chain_id}\n"
+            init_message += f"- Base Token: {self.config.base_token_name}\n"
+            init_message += "- Markets will be fetched dynamically from API"
             self.discord.send_message(init_message)
 
     def _setup_logger(self) -> logging.Logger:
-        """Initialize logging configuration"""
-        # Configure the root logger to catch all logs
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)
-
-        # Clear any existing handlers to avoid duplicates
-        root_logger.handlers.clear()
-
-        # Create console handler with formatting
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        root_logger.addHandler(handler)
-
-        # Get the FluxorBot logger
+        """Setup logger configuration"""
         logger = logging.getLogger("FluxorBot")
         logger.setLevel(logging.INFO)
 
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
         return logger
 
-    async def start(self):
-        """Start the bot"""
-        self.logger.info(f"Starting bot with {self.config.bot_run_interval} second interval...")
+    async def run(self):
+        """Run the bot once"""
+        try:
+            # Run all markets
+            await self.market_manager.run_all_markets()
 
-        if self.discord:
-            self.discord.send_message(f"🚀 Bot started with {self.config.bot_run_interval} second interval")
+        except SkipBotRun as e:
+            self.logger.warning(f"Skipping bot run: {e}")
 
-        while True:
-            try:
-                start_time = datetime.now()
-                self.logger.info(f"Starting Bot Run - Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            if self.discord:
+                self.discord.send_message(f"⏭️ **Bot Run Skipped**\n{e}")
 
-                # Run all market strategies concurrently
-                await self.market_manager.run_all_markets()
+        except Exception as e:
+            self.logger.error(f"Bot run failed: {e}")
 
-                end_time = datetime.now()
-                duration = (end_time - start_time).total_seconds()
-                self.logger.info(f"Completed Run in {duration:.2f}s - Next in {self.config.bot_run_interval}s")
+            if self.discord:
+                self.discord.send_message(f"💥 **Bot Run Failed**\n```{e}```")
 
-                await asyncio.sleep(self.config.bot_run_interval)
+            raise
 
-            except KeyboardInterrupt:
-                self.logger.info("Bot stopped by user")
-                if self.discord:
-                    self.discord.send_message("⛔ Bot stopped by user")
-                raise
-            except SkipBotRun:
-                self.logger.info("Skipping bot run")
-                self.logger.info(f"Next run in {self.config.bot_run_interval}s")
-                await asyncio.sleep(self.config.bot_run_interval)
-            except Exception as e:
-                self.logger.error(f"Error during bot execution: {str(e)}")
-                if self.discord:
-                    self.discord.send_message(f"❌ **Error**: {str(e)}")
-                self.logger.info(f"Next run in {self.config.bot_run_interval}s")
-                await asyncio.sleep(self.config.bot_run_interval)
+
+def run_bot():
+    """Main entry point for the bot"""
+    try:
+        bot = FluxorBot()
+        asyncio.run(bot.run())
+
+    except Exception as e:
+        logging.error(f"Failed to run bot: {e}")
+        raise

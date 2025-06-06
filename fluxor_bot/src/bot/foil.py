@@ -1,5 +1,5 @@
 import logging
-from typing import TypedDict
+from typing import Any, Dict, TypedDict
 
 from web3 import Web3
 from web3.contract import Contract
@@ -28,34 +28,46 @@ class Market(TypedDict):
 
 
 class Foil:
-    def __init__(self, w3: Web3, market_config):
+    def __init__(
+        self,
+        w3: Web3,
+        market_data: Dict[str, Any],
+        market_group_address: str,
+        collateral_asset: str,
+        uniswap_position_manager_address: str,
+    ):
         self.w3 = w3
-        self.market_config = market_config
-        self.logger = logging.getLogger(f"FluxorBot-{market_config.market_id}")
+        self.market_data = market_data
+        self.market_group_address = market_group_address
+        self.collateral_asset_address = collateral_asset  # Already checksummed from API
+        self.market_id = market_data["marketId"]
+        self.logger = logging.getLogger("FluxorBot")
 
-        market_group_address = market_config.market_group_address
+        # Still need contract for price data and other operations
         self.contract = w3.eth.contract(address=market_group_address, abi=abi_loader.get_abi("foil"))
         self.logger.info(f"Loaded foil contract at {market_group_address}")
 
-        self._hydrate_market_and_epoch()
+        # Initialize market and epoch from API data
+        self._hydrate_market_and_epoch_from_api(uniswap_position_manager_address)
 
         # Log market connection with claim statement
         self.logger.info(
-            f"🧠 Foil Market Connected ({market_config.market_id}) - "
-            f"Contract: {market_group_address}, Epoch ID: {self.epoch['epoch_id']}"
+            f"🧠 Foil Market Connected ({self.market_id}) - "
+            f"Contract: {market_group_address}, Market: {self.market_data['question'][:50]}..."
         )
-        self.logger.info(f"📝 Claim Statement: {self.epoch['claim_statement']}")
+        self.logger.info(f"📝 Market Question: {self.market_data['question']}")
+        self.logger.info(f"💰 Collateral Asset: {self.collateral_asset_address}")
 
-        # Get AI prediction for the claim statement
+        # Get AI prediction for the market question
         self._get_ai_prediction()
 
     def _get_ai_prediction(self):
-        """Get AI prediction likelihood for the claim statement"""
+        """Get AI prediction likelihood for the market question"""
         try:
             config = BotConfig.get_config()
 
             predictor = OpenAIPredictor(config.openai_api_key)
-            likelihood = predictor.get_prediction_likelihood(self.epoch["claim_statement"])
+            likelihood = predictor.get_prediction_likelihood(self.market_data["question"])
 
             if likelihood is not None:
                 self.logger.info(f"🤖 AI Prediction: {likelihood}% likelihood of resolving to 1")
@@ -74,41 +86,36 @@ class Foil:
         current_time = self.w3.eth.get_block("latest").timestamp
         return current_time < self.epoch["end_time"]
 
-    def _hydrate_market_and_epoch(self):
-        """Get the current epoch and market parameters"""
-        # Fix the contract call - getEpoch returns two named tuples
-        result = self.contract.functions.getEpoch(self.market_config.market_id).call()
-        epoch_data, market_params = result
+    def _hydrate_market_and_epoch_from_api(self, uniswap_position_manager_address: str):
+        """Initialize market and epoch data from API response"""
+        # Extract market data from API response
+        market_id = self.market_data["marketId"]
+        end_timestamp = self.market_data["endTimestamp"]
+        base_asset_min_tick = self.market_data["baseAssetMinPriceTick"]
+        base_asset_max_tick = self.market_data["baseAssetMaxPriceTick"]
+        question = self.market_data["question"]
 
-        # Extract from epoch_data tuple (EpochData struct)
-        epoch_id = epoch_data[0]  # epochId
-        end_time = epoch_data[2]  # endTime
-        base_asset_min_tick = epoch_data[8]  # baseAssetMinPriceTick
-        base_asset_max_tick = epoch_data[9]  # baseAssetMaxPriceTick
-        claim_statement_bytes = epoch_data[13]  # claimStatement (bytes)
+        # Use collateral asset from API (already checksummed) instead of contract call
+        collateral_token = self.collateral_asset_address
 
-        # Extract from market_params tuple (MarketParams struct)
-        uniswap_position_manager = market_params[4]  # uniswapPositionManager
-        # Convert bytes to string
-        claim_statement = claim_statement_bytes.decode("utf-8") if claim_statement_bytes else ""
-
-        (_, collateral_token, *_) = self.contract.functions.getMarket().call()
-        tick_spacing = self.contract.functions.getMarketTickSpacing().call()
-
-        position_manager = self.w3.eth.contract(address=uniswap_position_manager, abi=POSITION_MANAGER_ABI)
+        # Create contract instances
+        position_manager = self.w3.eth.contract(address=uniswap_position_manager_address, abi=POSITION_MANAGER_ABI)
         collateral_asset = self.w3.eth.contract(address=collateral_token, abi=abi_loader.get_abi("erc20"))
 
+        # Create epoch data structure
         self.epoch = Epoch(
-            epoch_id=epoch_id,
-            end_time=end_time,
+            epoch_id=market_id,  # Using market_id as epoch_id
+            end_time=end_timestamp,
             base_asset_min_tick=base_asset_min_tick,
             base_asset_max_tick=base_asset_max_tick,
-            claim_statement=claim_statement,
+            claim_statement=question,
         )
+
+        # Create market params with hardcoded tick spacing
         self.market_params: Market = {
             "uniswap_position_manager": position_manager,
             "collateral_asset": collateral_asset,
-            "tick_spacing": tick_spacing,
+            "tick_spacing": 200,  # Hardcoded as requested
         }
 
     def get_current_price_d18(self) -> int:
