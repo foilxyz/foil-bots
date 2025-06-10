@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, TypedDict
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import TransportQueryError
+from web3 import Web3
 
 
 class TrailingCandle(TypedDict):
@@ -101,6 +102,107 @@ class AsyncFoilAPIClient:
         except Exception as e:
             self.logger.error(f"API client error: {str(e)}")
             raise Exception(f"Failed to fetch trailing average: {str(e)}")
+
+    async def get_market_groups(self, chain_id: int, current_time: str, base_token_name: str) -> Dict[str, Any]:
+        """
+        Asynchronously fetch market groups
+
+        Args:
+            chain_id: The blockchain chain ID
+            current_time: Current timestamp to filter markets
+            base_token_name: The base token name
+
+        Returns:
+            The market groups data as a dictionary with checksummed addresses
+        """
+        query = gql(
+            """
+            query GetMarketGroups($chainId: Int!, $currentTime: String!, $baseTokenName: String!) {
+              marketGroups(
+                chainId: $chainId,
+                baseTokenName: $baseTokenName
+              ) {
+                address
+                question
+                collateralAsset
+                marketParams {
+                  uniswapPositionManager
+                }
+                markets(
+                  filter: { 
+                    endTimestamp_gt: $currentTime, # Market ends in the future
+                  }
+                ) {
+                  question
+                  marketId
+                  endTimestamp
+                  public
+                  baseAssetMaxPriceTick
+                  baseAssetMinPriceTick
+                }
+              }
+            }
+            """
+        )
+
+        variables = {
+            "chainId": chain_id,
+            "currentTime": current_time,
+            "baseTokenName": base_token_name,
+        }
+
+        self.logger.info(
+            f"Query variables: "
+            f"chainId={variables['chainId']}, currentTime={variables['currentTime']}, "
+            f"baseTokenName={variables['baseTokenName']}"
+        )
+
+        try:
+            # Execute the query asynchronously
+            result = await self.client.execute_async(query, variable_values=variables)
+
+            # Checksum all addresses in the result
+            self._checksum_addresses_in_result(result)
+
+            return result
+
+        except TransportQueryError as e:
+            error_message = str(e)
+            self.logger.error(f"GraphQL query error: {error_message}")
+            if hasattr(e, "errors") and e.errors:
+                for err in e.errors:
+                    self.logger.error(f"GraphQL error details: {err}")
+            raise Exception(f"Failed to fetch market groups: {error_message}")
+        except Exception as e:
+            self.logger.error(f"API client error: {str(e)}")
+            raise Exception(f"Failed to fetch market groups: {str(e)}")
+
+    def _checksum_addresses_in_result(self, result: Dict[str, Any]) -> None:
+        """
+        Checksum all address fields in the API result in-place
+
+        Args:
+            result: The API result dictionary to modify
+        """
+        if "marketGroups" in result:
+            for market_group in result["marketGroups"]:
+                # Checksum market group address
+                if "address" in market_group and market_group["address"]:
+                    market_group["address"] = Web3.to_checksum_address(market_group["address"])
+
+                # Checksum collateral asset address
+                if "collateralAsset" in market_group and market_group["collateralAsset"]:
+                    market_group["collateralAsset"] = Web3.to_checksum_address(market_group["collateralAsset"])
+
+                # Checksum uniswap position manager address
+                if "marketParams" in market_group and market_group["marketParams"]:
+                    if (
+                        "uniswapPositionManager" in market_group["marketParams"]
+                        and market_group["marketParams"]["uniswapPositionManager"]
+                    ):
+                        market_group["marketParams"]["uniswapPositionManager"] = Web3.to_checksum_address(
+                            market_group["marketParams"]["uniswapPositionManager"]
+                        )
 
     async def query_async(self, query_string: str, variables: Dict[str, Any] = None) -> Dict[str, Any]:
         """
