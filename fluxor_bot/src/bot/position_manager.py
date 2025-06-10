@@ -389,18 +389,18 @@ class PositionManager:
 
             # Send transaction with higher gas and shorter timeout for Base mainnet
             self.logger.info(f"[Market {market_id}] Sending liquidity position creation transaction...")
-            # send_transaction(
-            #     self.w3,
-            #     foil_contract.functions.createLiquidityPosition,
-            #     self.account_address,
-            #     BotConfig.get_config().wallet_pk,
-            #     self.logger,
-            #     "FluxorBot: Create Liquidity Position",
-            #     position_params,
-            #     gas_multiplier=1.5,  # Use 150% of estimated gas instead of 120%
-            #     timeout=60,  # Reduce timeout to 1 minute to avoid hanging
-            #     poll_latency=3,  # Check every 3 seconds
-            # )
+            send_transaction(
+                self.w3,
+                foil_contract.functions.createLiquidityPosition,
+                self.account_address,
+                BotConfig.get_config().wallet_pk,
+                self.logger,
+                "FluxorBot: Create Liquidity Position",
+                position_params,
+                gas_multiplier=1.5,  # Use 150% of estimated gas instead of 120%
+                timeout=60,  # Reduce timeout to 1 minute to avoid hanging
+                poll_latency=3,  # Check every 3 seconds
+            )
 
             self.logger.info(f"✅ [Market {market_id}] Position created successfully!")
 
