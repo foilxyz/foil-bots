@@ -22,9 +22,10 @@ class BotConfig(BaseConfig):
     wallet_pk: str
 
     # Bot parameters
-    position_size: float
+    collateral_size: float
     risk_spread_spacing_width: float
     lp_range_width: float
+    rebalance_deviation: float
     openai_api_key: str
 
     # Discord configuration
@@ -59,9 +60,10 @@ class BotConfig(BaseConfig):
         # Load other configuration
         rpc_url = ConfigManager.get_required_str("NETWORK_RPC_URL")
         wallet_pk = ConfigManager.get_required_str("FLUXOR_BOT_WALLET_PK")
-        position_size = ConfigManager.get_float("FLUXOR_BOT_POSITION_SIZE", 1.0)
+        collateral_size = ConfigManager.get_float("FLUXOR_BOT_COLLATERAL_SIZE", 1.0)
         risk_spread_spacing_width = ConfigManager.get_float("FLUXOR_BOT_RISK_SPREAD_SPACING_WIDTH", 0.1)
         lp_range_width = ConfigManager.get_float("FLUXOR_BOT_LP_RANGE_WIDTH", 0.2)
+        rebalance_deviation = ConfigManager.get_float("FLUXOR_BOT_REBALANCE_DEVIATION", 5)
 
         # Discord configuration
         discord_bot_token = ConfigManager.get_optional_str("DISCORD_BOT_TOKEN")
@@ -74,9 +76,10 @@ class BotConfig(BaseConfig):
             base_token_name=base_token_name,
             rpc_url=rpc_url,
             wallet_pk=wallet_pk,
-            position_size=position_size,
+            collateral_size=collateral_size,
             risk_spread_spacing_width=risk_spread_spacing_width,
             lp_range_width=lp_range_width,
+            rebalance_deviation=rebalance_deviation,
             openai_api_key=openai_api_key,
             discord_bot_token=discord_bot_token,
             discord_channel_id=discord_channel_id,

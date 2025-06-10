@@ -1,148 +1,213 @@
-# Fluxor Bot
+# FluxorBot 🤖
 
-A bot for automated trading on Foil prediction markets with AI-powered predictions and dynamic market discovery via API.
+An autonomous liquidity provisioning bot for Foil prediction markets, powered by OpenAI and designed for forking and customization.
 
-## Features
+## 🚀 What FluxorBot Does
 
-- **Dynamic Market Discovery**: Automatically discovers and manages markets via the Foil API
-- **Async Processing**: Concurrent execution of strategies across all discovered markets
-- **Liquidity Position Management**: Creates and manages liquidity positions on prediction markets
-- **AI-Powered Predictions**: Uses OpenAI to analyze market questions and predict outcomes
-- **Risk Management**: Configurable position sizing and spread parameters
-- **Discord Integration**: Real-time notifications and alerts
-- **Cron-Friendly**: Designed to run as scheduled jobs rather than continuously
+**FluxorBot automatically provides liquidity to ALL active prediction markets** by:
 
-## Configuration
+1. **🔍 Auto-Discovery**: Discovers all active markets via Foil API
+2. **🧠 AI Analysis**: Analyzes each market question using OpenAI's GPT models
+3. **💰 Smart Positioning**: Creates optimal liquidity positions based on AI predictions
+4. **⚡ Auto-Rebalancing**: Continuously rebalances positions when AI predictions deviate
+5. **📊 Quirky Reporting**: Generates nerdy social media posts about trading activity
 
-The bot is configured through environment variables:
+## 🎯 Core Features
 
-### Required Variables
+### Autonomous Market Making
+
+- **Zero Manual Configuration**: Automatically finds and trades on all active Foil markets
+- **AI-Driven Predictions**: Uses GPT-4o-mini to analyze market questions and predict outcomes
+- **Dynamic Position Sizing**: Creates liquidity positions around AI prediction confidence levels
+- **Smart Rebalancing**: Automatically adjusts positions when predictions change significantly
+
+### Built for Developers
+
+- **Fork-Friendly Architecture**: Clean, modular codebase designed for customization
+- **Configurable Strategy**: Easy to modify trading logic and risk parameters
+- **Comprehensive Logging**: Detailed logs for debugging and monitoring
+- **Discord Integration**: Real-time notifications and quirky AI-generated summaries
+
+## 🛠 Quick Start (Forking Guide)
+
+### 1. Fork & Install
 
 ```bash
-# Network and wallet configuration
-NETWORK_RPC_URL=https://your-rpc-endpoint
-FLUXOR_BOT_WALLET_PK=your_private_key
-
-# API configuration
-FLUXOR_BOT_FOIL_API_URL=https://api.foil.com
-FLUXOR_BOT_COLLATERAL_ASSET=USDC
-FLUXOR_BOT_CHAIN_ID=1
-FLUXOR_BOT_BASE_TOKEN_NAME=ETH
-
-# OpenAI API configuration (required for AI predictions)
-FLUXOR_BOT_OPENAI_API_KEY=your_openai_api_key
+git clone https://github.com/yourusername/foil-bots
+cd foil-bots/fluxor_bot
+poetry install
 ```
 
-### Optional Variables
+### 2. Environment Configuration
+
+Create a `.env` file in the project root:
 
 ```bash
-# Bot behavior
-FLUXOR_BOT_POSITION_SIZE=1.0    # Position size in tokens (default: 1.0)
+# 🔑 Required - Wallet & Network
+NETWORK_RPC_URL=https://mainnet.base.org
+FLUXOR_BOT_WALLET_PK=your_private_key_here
 
-# Strategy parameters
-FLUXOR_BOT_RISK_SPREAD_SPACING_WIDTH=0.1  # Risk spread width (default: 0.1)
-FLUXOR_BOT_LP_RANGE_WIDTH=0.2             # LP range width (default: 0.2)
+# 🔗 Required - Foil API
+FOIL_API_URL=https://api.foil.xyz/graphql
+FLUXOR_BOT_CHAIN_ID=8453
+FLUXOR_BOT_BASE_TOKEN_NAME=WETH
 
-# Discord notifications (optional)
+# 🧠 Required - OpenAI API
+FLUXOR_BOT_OPENAI_API_KEY=sk-your-openai-key-here
+
+# 💰 Trading Parameters
+FLUXOR_BOT_COLLATERAL_SIZE=10.0           # USDC per position
+FLUXOR_BOT_RISK_SPREAD_SPACING_WIDTH=0.1  # Position spread width
+FLUXOR_BOT_LP_RANGE_WIDTH=10              # Liquidity range width
+FLUXOR_BOT_REBALANCE_DEVIATION=5          # Rebalance threshold (tick spacings)
+
+# 📢 Optional - Discord Notifications
 DISCORD_BOT_TOKEN=your_discord_bot_token
 DISCORD_CHANNEL_ID=your_discord_channel_id
 ```
 
-## Dynamic Market Discovery
-
-The bot now automatically discovers markets through the Foil API instead of requiring manual configuration. It fetches:
-
-- Market groups based on collateral asset, chain ID, and base token
-- All active markets within those groups (markets ending in the future)
-- Market parameters including Uniswap position manager addresses
-- Market questions and price tick ranges
-
-This eliminates the need for manual market configuration and ensures the bot always works with current, active markets.
-
-## AI Prediction System
-
-The bot uses OpenAI's GPT models to analyze prediction market questions and estimate the likelihood of resolution. For each market, the bot will:
-
-1. Extract the market question from the API response
-2. Send it to OpenAI for analysis
-3. Receive a percentage likelihood (0-100%) that the market will resolve to 1
-4. Log the prediction and store it for strategy use
-
-Example log output:
-
-```
-📝 Market Question: Will BTC reach $100,000 by end of 2024?
-🤖 AI Prediction: 25% likelihood of resolving to 1
-```
-
-## Installation and Usage
-
-1. **Install dependencies**:
-
-   ```bash
-   poetry install
-   ```
-
-2. **Set environment variables** (see Configuration section above)
-
-3. **Run the bot**:
-   ```bash
-   poetry run fluxor-bot
-   ```
-
-### Cron Configuration
-
-The bot is designed to run as scheduled cron jobs. Here's an example cron configuration to run the bot every 10 minutes:
+### 3. Run the Bot
 
 ```bash
-# Run Fluxor Bot every 10 minutes
-*/10 * * * * cd /path/to/fluxor-bot && poetry run fluxor-bot >> /var/log/fluxor-bot.log 2>&1
+# Single run
+poetry run fluxor-bot
+
+# Continuous (cron every 10 minutes)
+*/10 * * * * cd /path/to/fluxor_bot && poetry run fluxor-bot >> bot.log 2>&1
 ```
 
-For deployment on platforms like Render, you can configure the `fluxor-bot` command as a cron job in your deployment settings.
+## 🧠 How AI Predictions Work
 
-## Architecture
+FluxorBot sends market questions to OpenAI's GPT-4o-mini model with this workflow:
 
-- **MarketManager**: Coordinates API calls and manages multiple market tasks with async execution
-- **MarketTask**: Individual market trading logic and strategy execution
-- **Foil**: Smart contract interaction and market data management (now uses API data)
-- **Position**: Liquidity position creation and management
-- **Strategy**: Trading logic and decision making
-- **AsyncFoilAPIClient**: GraphQL API client for fetching market data
-- **OpenAI Integration**: AI-powered market question analysis and predictions
+```python
+# Example: Market question analysis
+Question: "Will BTC reach $100,000 by end of 2024?"
 
-## Strategy Development
+# FluxorBot sends to OpenAI:
+"Analyze this prediction market question and estimate the likelihood
+(0-100%) that it will resolve to 'Yes/True/1'..."
 
-The bot includes a placeholder strategy implementation that can be customized for your trading logic. The strategy receives:
+# OpenAI Response:
+"Based on current BTC trends and historical data: 25% likelihood"
 
-- Market data from the API (questions, price ranges, end times)
-- AI predictions for market outcomes
-- Current positions and liquidity data
-- Contract interfaces for executing trades
+# FluxorBot Action:
+Creates liquidity positions with 25% confidence:
+- Low position: Below 25% price range
+- High position: Above 25% price range
+```
 
-## Migration from Environment Configuration
+## ⚖️ Auto-Rebalancing Logic
 
-**Breaking Change**: The bot no longer uses the `FLUXOR_BOT_MARKET_GROUPS` environment variable. Instead, it dynamically discovers markets via the API using the new configuration parameters. This provides:
+The bot continuously monitors AI prediction changes and rebalances when deviation exceeds threshold:
 
-- Automatic discovery of new markets
-- No need to manually update market configurations
-- Always trading on current, active markets
-- Simplified deployment and maintenance
+```python
+# Rebalancing trigger example:
+Original AI Prediction: 25% → New AI Prediction: 65%
+Position Deviation: > 5 tick spacings from optimal range
+Action: Close all positions → Create new positions around 65% confidence
+```
 
-## Logging
+## 🏗 Architecture (For Developers)
 
-The bot provides detailed logging for:
+### Core Components
 
-- Market initialization and connection status
-- Market questions and AI predictions
-- Strategy execution and performance
-- Error handling and debugging
+```
+├── 🎯 strategy.py          # Main trading logic - CUSTOMIZE HERE
+├── 🤖 llm_post_generator.py # OpenAI integration for social posts
+├── 📊 position_manager.py   # Position creation/closing logic
+├── 🌐 market_manager.py     # Market discovery and coordination
+├── 📡 foil.py              # Smart contract interactions
+└── ⚙️ config.py            # Configuration management
+```
 
-## Discord Integration
+### Key Extension Points
 
-When configured, the bot sends notifications for:
+**1. Custom Trading Strategy** (`strategy.py`):
 
-- Bot initialization and market setup
-- Strategy execution summaries
-- Errors and important events
-- Performance metrics
+```python
+async def _create_positions(self, prediction_percentage: float):
+    # 🎯 CUSTOMIZE: Your position creation logic here
+    # Current: Creates positions around AI prediction
+    # Fork ideas: Add technical analysis, sentiment, volume data
+```
+
+**2. AI Prediction Enhancement** (`llm_post_generator.py`):
+
+```python
+async def generate_summary_post(self, run_data):
+    # 🧠 CUSTOMIZE: Your AI prompt engineering here
+    # Current: Generates quirky trading summaries
+    # Fork ideas: Add market analysis, performance metrics
+```
+
+**3. Position Management** (`position_manager.py`):
+
+```python
+async def close_position(self, position_data, foil_contract, market_id):
+    # ⚖️ CUSTOMIZE: Your position management logic
+    # Current: Simple close-all strategy
+    # Fork ideas: Partial closes, profit-taking, stop-losses
+```
+
+## 📊 Monitoring & Debugging
+
+### Log Analysis
+
+```bash
+# Real-time monitoring
+tail -f bot.log | grep "FLUXOR LLM CONTEXT"
+
+# Filter AI predictions
+grep "AI Prediction:" bot.log
+
+# Position creation tracking
+grep "Position created successfully" bot.log
+```
+
+### Performance Metrics
+
+The bot tracks and logs:
+
+- ✅ Successful position creations per market
+- ❌ Failed transactions and reasons
+- 🔄 Rebalancing frequency and triggers
+- 💰 Total collateral deployed
+- 🧠 AI prediction accuracy over time
+
+## 🚀 Deployment Options
+
+### Local Development
+
+```bash
+poetry run fluxor-bot  # Single run for testing
+```
+
+### Production Cron
+
+```bash
+# /etc/crontab - Run every 10 minutes
+*/10 * * * * cd /opt/fluxor_bot && poetry run fluxor-bot >> /var/log/fluxor.log 2>&1
+```
+
+### Cloud Deployment (Render/Railway)
+
+```bash
+# Build command
+poetry install
+
+# Start command
+poetry run fluxor-bot
+
+# Add environment variables via platform dashboard
+```
+
+### 1. Different AI Models
+
+```python
+# In llm_post_generator.py
+response = self.client.chat.completions.create(
+    model="gpt-4-turbo",  # Upgrade for better analysis
+    # or "claude-3-opus" with Anthropic client
+)
+```

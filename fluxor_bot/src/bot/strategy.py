@@ -1,30 +1,38 @@
 import logging
 import time
+from typing import Dict, Optional
 
 from shared.utils.web3_utils import price_to_tick, tick_to_price
 
 from .config import BotConfig
 from .foil import Foil
-from .position import Position
+from .position_manager import PositionManager
 
 
 class FluxorStrategy:
-    def __init__(self, position: Position, foil: Foil, account_address: str):
-        self.position = position
+    def __init__(self, position_manager: PositionManager, foil: Foil, account_address: str):
+        self.position_manager = position_manager
         self.foil = foil
         self.account_address = account_address
         self.logger = logging.getLogger("FluxorBot")
         self.config = BotConfig.get_config()
 
-    def run(self) -> None:
+    async def run(self) -> Dict:
         """Execute the trading strategy"""
         market_id = self.foil.market_id
         self.logger.info(f"🔄 [Market {market_id}] Running Fluxor strategy...")
 
+        # Initialize result data
+        result = {
+            "action_taken": "no_change",
+            "positions_created": 0,
+            "positions_closed": 0,
+        }
+
         # Check if market is live
         if not self.foil.is_live():
             self.logger.warning(f"[Market {market_id}] Market epoch is not live, skipping strategy execution")
-            return
+            return result
 
         # Get current price
         current_price_d18 = self.foil.get_current_price_d18()
@@ -38,17 +46,35 @@ class FluxorStrategy:
                 f"🤖 [Market {market_id}] AI Prediction: {self.foil.ai_prediction}% likelihood of resolving to 1"
             )
 
-        # Example strategy placeholder:
-        if self.position.has_current_position():
-            self.logger.info(f"[Market {market_id}] Position already exists - TODO")
+        # Check existing positions
+        existing_positions = self.position_manager.get_positions_for_market(market_id)
+        if existing_positions:
+            self.logger.info(f"[Market {market_id}] Found {len(existing_positions)} existing positions:")
+            for pos in existing_positions:
+                self.logger.info(
+                    f"  - Position ID: {pos['position_id']}, Ticks: {pos['low_price_tick']}-{pos['high_price_tick']}, "
+                    f"Base: {pos['lp_base_token']}, Quote: {pos['lp_quote_token']}"
+                )
+
+            # Check if positions need rebalancing
+            if hasattr(self.foil, "ai_prediction") and self.foil.ai_prediction is not None:
+                rebalance_result = await self._check_and_rebalance_positions(
+                    existing_positions, self.foil.ai_prediction
+                )
+                result.update(rebalance_result)
+            else:
+                self.logger.warning(f"[Market {market_id}] No AI prediction available for rebalancing check")
         else:
-            self.logger.info(f"[Market {market_id}] No position found - checking with AI")
+            self.logger.info(f"[Market {market_id}] No existing positions found - checking with AI")
 
             # Create actual positions based on AI prediction
             if hasattr(self.foil, "ai_prediction") and self.foil.ai_prediction is not None:
-                self._create_positions(self.foil.ai_prediction)
+                creation_result = await self._create_positions(self.foil.ai_prediction)
+                result.update(creation_result)
             else:
                 self.logger.warning(f"[Market {market_id}] No AI prediction available, skipping position creation")
+
+        return result
 
     def _calculate_position_ticks(self, prediction_percentage: float):
         """
@@ -131,7 +157,7 @@ class FluxorStrategy:
 
         return positions
 
-    def _create_positions(self, prediction_percentage: float) -> None:
+    async def _create_positions(self, prediction_percentage: float) -> Dict:
         """Create actual positions based on AI prediction percentage"""
         market_id = self.foil.market_id
         self.logger.info(f"📊 [Market {market_id}] Creating positions for {prediction_percentage}% prediction")
@@ -143,7 +169,7 @@ class FluxorStrategy:
         valid_positions = [pos for pos in positions.values() if pos is not None]
         if not valid_positions:
             self.logger.warning(f"⚠️ [Market {market_id}] No valid positions within market bounds, skipping")
-            return
+            return {"positions_created": 0}
 
         # Log the positions we're about to create
         self.logger.info(f"🏗️ [Market {market_id}] CREATING VALID POSITIONS:")
@@ -160,9 +186,10 @@ class FluxorStrategy:
                 self.logger.info(f"   Price Range: {low_min_price:.4f} to {low_max_price:.4f}")
 
                 self.logger.info(f"🚀 [Market {market_id}] Creating low position...")
-                # TODO: Uncomment when ready to create actual positions
-                # self.position.open_new_position(low_min_tick, low_max_tick)
-                self.logger.info(f"✅ [Market {market_id}] Low position created successfully (SIMULATED)")
+                await self.position_manager.create_position(
+                    self.foil.contract, self.foil.epoch, self.foil.market_params, low_min_tick, low_max_tick, market_id
+                )
+                self.logger.info(f"✅ [Market {market_id}] Low position created successfully")
 
             # Create high position if valid
             if positions["high"] is not None:
@@ -175,13 +202,105 @@ class FluxorStrategy:
                 self.logger.info(f"   Price Range: {high_min_price:.4f} to {high_max_price:.4f}")
 
                 self.logger.info(f"🚀 [Market {market_id}] Creating high position...")
-                # TODO: Uncomment when ready to create actual positions
-                # self.position.open_new_position(high_min_tick, high_max_tick)
-                self.logger.info(f"✅ [Market {market_id}] High position created successfully (SIMULATED)")
+                await self.position_manager.create_position(
+                    self.foil.contract,
+                    self.foil.epoch,
+                    self.foil.market_params,
+                    high_min_tick,
+                    high_max_tick,
+                    market_id,
+                )
+                self.logger.info(f"✅ [Market {market_id}] High position created successfully")
 
             created_count = len(valid_positions)
-            self.logger.info(f"🎉 [Market {market_id}] {created_count} position(s) created successfully! (SIMULATED)")
+            self.logger.info(f"🎉 [Market {market_id}] {created_count} position(s) created successfully!")
+
+            return {"action_taken": "created_positions", "positions_created": created_count}
 
         except Exception as e:
             self.logger.error(f"❌ [Market {market_id}] Failed to create positions: {str(e)}")
             raise
+
+    async def _check_and_rebalance_positions(self, existing_positions, ai_prediction) -> Dict:
+        """Check if existing positions need rebalancing and close them if needed"""
+        market_id = self.foil.market_id
+        self.logger.info(
+            f"🔄 [Market {market_id}] Checking positions for rebalancing against {ai_prediction}% prediction"
+        )
+
+        # Calculate optimal positions based on current AI prediction
+        optimal_positions = self._calculate_position_ticks(ai_prediction)
+
+        # Get deviation threshold in ticks
+        tick_spacing = self.foil.market_params["tick_spacing"]
+        rebalance_deviation_ticks = int(self.config.rebalance_deviation * tick_spacing)
+
+        self.logger.info(
+            f"📏 [Market {market_id}] Rebalance deviation threshold: {rebalance_deviation_ticks} ticks ({self.config.rebalance_deviation} * {tick_spacing})"
+        )
+
+        # Take the first LP position's lower tick
+        first_position = existing_positions[0]
+        first_position_lower_tick = first_position["low_price_tick"]
+
+        self.logger.info(
+            f"🔍 [Market {market_id}] Checking first position {first_position['position_id']} lower tick: {first_position_lower_tick}"
+        )
+
+        # Check if first position's lower tick is too far from both optimal positions
+        needs_rebalancing = False
+
+        # Check distance from optimal low position (if it exists)
+        low_distance = float("inf")
+        if optimal_positions["low"] is not None:
+            optimal_low_lower, _ = optimal_positions["low"]
+            low_distance = abs(first_position_lower_tick - optimal_low_lower)
+            self.logger.info(f"📐 [Market {market_id}] Distance from optimal low position: {low_distance} ticks")
+
+        # Check distance from optimal high position (if it exists)
+        high_distance = float("inf")
+        if optimal_positions["high"] is not None:
+            optimal_high_lower, _ = optimal_positions["high"]
+            high_distance = abs(first_position_lower_tick - optimal_high_lower)
+            self.logger.info(f"📐 [Market {market_id}] Distance from optimal high position: {high_distance} ticks")
+
+        # If first position is too far from BOTH optimal positions, rebalance
+        if low_distance > rebalance_deviation_ticks and high_distance > rebalance_deviation_ticks:
+            needs_rebalancing = True
+            self.logger.info(
+                f"🔄 [Market {market_id}] Rebalancing needed - first position too far from both optimal positions"
+            )
+            self.logger.info(f"   Low distance: {low_distance} > {rebalance_deviation_ticks}")
+            self.logger.info(f"   High distance: {high_distance} > {rebalance_deviation_ticks}")
+        else:
+            self.logger.info(f"✅ [Market {market_id}] First position close enough to at least one optimal position")
+            self.logger.info(f"   Closest distance: {min(low_distance, high_distance)} <= {rebalance_deviation_ticks}")
+
+        # Close all positions and create new ones if rebalancing needed
+        if needs_rebalancing:
+            self.logger.info(f"🔄 [Market {market_id}] Closing all {len(existing_positions)} positions for rebalancing")
+
+            positions_closed = 0
+            # Close all existing positions
+            for pos in existing_positions:
+                try:
+                    await self.position_manager.close_position(pos, self.foil.contract, market_id)
+                    positions_closed += 1
+                except Exception as e:
+                    self.logger.error(
+                        f"❌ [Market {market_id}] Failed to close position {pos['position_id']}: {str(e)}"
+                    )
+                    continue
+
+            # Create new optimal positions
+            self.logger.info(f"🏗️ [Market {market_id}] Creating new optimal positions after rebalancing")
+            creation_result = await self._create_positions(ai_prediction)
+
+            return {
+                "action_taken": "rebalanced",
+                "positions_closed": positions_closed,
+                "positions_created": creation_result.get("positions_created", 0),
+            }
+        else:
+            self.logger.info(f"✅ [Market {market_id}] No rebalancing needed, keeping existing positions")
+            return {"action_taken": "no_change", "positions_closed": 0, "positions_created": 0}
