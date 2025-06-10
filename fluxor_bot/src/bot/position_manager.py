@@ -26,6 +26,14 @@ class PositionData(TypedDict):
     lp_base_token: int
     lp_quote_token: int
     liquidity: int
+    pnl: Optional[int]  # PnL in wei, None if failed to fetch
+
+
+class MarketPnlData(TypedDict):
+    market_id: int
+    total_pnl: int
+    position_count: int
+    positions_with_pnl: List[Dict[str, Any]]
 
 
 class PositionManager:
@@ -202,6 +210,81 @@ class PositionManager:
         """Get the number of active positions for a market"""
         return len(self.get_positions_for_market(market_id))
 
+    async def collect_pnl_for_market(self, market_id: int, foil_contract) -> MarketPnlData:
+        """
+        Collect PnL data for all positions in a market
+
+        Args:
+            market_id: The market ID to collect PnL for
+            foil_contract: The Foil contract instance
+
+        Returns:
+            MarketPnlData with aggregated PnL information
+        """
+        positions = self.get_positions_for_market(market_id)
+
+        market_pnl_data: MarketPnlData = {
+            "market_id": market_id,
+            "total_pnl": 0,
+            "position_count": len(positions),
+            "positions_with_pnl": [],
+        }
+
+        if not positions:
+            self.logger.info(f"[Market {market_id}] No positions to collect PnL for")
+            return market_pnl_data
+
+        self.logger.info(f"[Market {market_id}] Collecting PnL for {len(positions)} positions...")
+
+        for position_data in positions:
+            position_id = position_data["position_id"]
+            try:
+                # Call getPositionPnl on the Foil contract
+                pnl_wei = foil_contract.functions.getPositionPnl(position_id).call()
+                pnl_susds = self.w3.from_wei(pnl_wei, "ether")  # sUSDS has 18 decimals like ETH
+
+                # Update position data with PnL
+                position_data["pnl"] = pnl_wei
+
+                # Add to market totals
+                market_pnl_data["total_pnl"] += pnl_wei
+                market_pnl_data["positions_with_pnl"].append(
+                    {
+                        "position_id": position_id,
+                        "pnl_wei": pnl_wei,
+                        "pnl_susds": float(pnl_susds),
+                    }
+                )
+
+                self.logger.info(f"[Market {market_id}] Position {position_id} PnL: {pnl_susds:.6f} sUSDS")
+
+            except Exception as e:
+                self.logger.warning(f"[Market {market_id}] Failed to get PnL for position {position_id}: {str(e)}")
+                position_data["pnl"] = None
+
+        total_pnl_susds = self.w3.from_wei(market_pnl_data["total_pnl"], "ether")
+        self.logger.info(
+            f"[Market {market_id}] Total PnL: {total_pnl_susds:.6f} sUSDS across {len(positions)} positions"
+        )
+
+        return market_pnl_data
+
+    async def collect_all_pnl(self) -> Dict[int, MarketPnlData]:
+        """
+        Collect PnL data for all markets with positions
+
+        Returns:
+            Dictionary mapping market_id to MarketPnlData
+        """
+        all_pnl_data = {}
+
+        for market_id in self.positions_by_market.keys():
+            # Note: We need the foil_contract for each market, but we don't have access here
+            # This method will be called from MarketManager where contracts are available
+            self.logger.info(f"Market {market_id} has positions, PnL collection will be handled by MarketManager")
+
+        return all_pnl_data
+
     async def create_position(
         self, foil_contract, epoch_data: Dict, market_params: Dict, new_lower: int, new_upper: int, market_id: int
     ) -> None:
@@ -220,7 +303,7 @@ class PositionManager:
         sqrt_price_x96_upper = tick_to_sqrt_price_x96(new_upper)
 
         # Get current price from the contract
-        sqrt_price_x96_current = foil_contract.functions.getCurrentPriceSqrtX96().call()
+        sqrt_price_x96_current = foil_contract.functions.getSqrtPriceX96(market_id).call()
 
         # Get user's collateral balance
         collateral_balance = market_params["collateral_asset"].functions.balanceOf(self.account_address).call()
@@ -306,18 +389,18 @@ class PositionManager:
 
             # Send transaction with higher gas and shorter timeout for Base mainnet
             self.logger.info(f"[Market {market_id}] Sending liquidity position creation transaction...")
-            send_transaction(
-                self.w3,
-                foil_contract.functions.createLiquidityPosition,
-                self.account_address,
-                BotConfig.get_config().wallet_pk,
-                self.logger,
-                "FluxorBot: Create Liquidity Position",
-                position_params,
-                gas_multiplier=1.5,  # Use 150% of estimated gas instead of 120%
-                timeout=60,  # Reduce timeout to 1 minute to avoid hanging
-                poll_latency=3,  # Check every 3 seconds
-            )
+            # send_transaction(
+            #     self.w3,
+            #     foil_contract.functions.createLiquidityPosition,
+            #     self.account_address,
+            #     BotConfig.get_config().wallet_pk,
+            #     self.logger,
+            #     "FluxorBot: Create Liquidity Position",
+            #     position_params,
+            #     gas_multiplier=1.5,  # Use 150% of estimated gas instead of 120%
+            #     timeout=60,  # Reduce timeout to 1 minute to avoid hanging
+            #     poll_latency=3,  # Check every 3 seconds
+            # )
 
             self.logger.info(f"✅ [Market {market_id}] Position created successfully!")
 

@@ -32,6 +32,13 @@ class BotConfig(BaseConfig):
     discord_bot_token: Optional[str] = None
     discord_channel_id: Optional[str] = None
 
+    # X (Twitter) configuration
+    x_api_key: Optional[str] = None
+    x_api_secret: Optional[str] = None
+    x_access_token: Optional[str] = None
+    x_access_token_secret: Optional[str] = None
+    x_bearer_token: Optional[str] = None
+
     @classmethod
     def from_env(cls) -> "BotConfig":
         """Load configuration from environment variables"""
@@ -69,6 +76,13 @@ class BotConfig(BaseConfig):
         discord_bot_token = ConfigManager.get_optional_str("DISCORD_BOT_TOKEN")
         discord_channel_id = ConfigManager.get_optional_str("DISCORD_CHANNEL_ID")
 
+        # X (Twitter) configuration
+        x_api_key = ConfigManager.get_optional_str("FLUXOR_BOT_X_API_KEY")
+        x_api_secret = ConfigManager.get_optional_str("FLUXOR_BOT_X_API_SECRET")
+        x_access_token = ConfigManager.get_optional_str("FLUXOR_BOT_X_ACCESS_TOKEN")
+        x_access_token_secret = ConfigManager.get_optional_str("FLUXOR_BOT_X_ACCESS_TOKEN_SECRET")
+        x_bearer_token = ConfigManager.get_optional_str("FLUXOR_BOT_X_BEARER_TOKEN")
+
         # Create and return the config
         return cls(
             foil_api_url=foil_api_url,
@@ -83,4 +97,9 @@ class BotConfig(BaseConfig):
             openai_api_key=openai_api_key,
             discord_bot_token=discord_bot_token,
             discord_channel_id=discord_channel_id,
+            x_api_key=x_api_key,
+            x_api_secret=x_api_secret,
+            x_access_token=x_access_token,
+            x_access_token_secret=x_access_token_secret,
+            x_bearer_token=x_bearer_token,
         )

@@ -11,6 +11,7 @@ An autonomous liquidity provisioning bot for Foil prediction markets, powered by
 3. **💰 Smart Positioning**: Creates optimal liquidity positions based on AI predictions
 4. **⚡ Auto-Rebalancing**: Continuously rebalances positions when AI predictions deviate
 5. **📊 Quirky Reporting**: Generates nerdy social media posts about trading activity
+6. **🐦 X Integration**: Automatically posts AI-generated summaries to X (Twitter)
 
 ## 🎯 Core Features
 
@@ -27,6 +28,7 @@ An autonomous liquidity provisioning bot for Foil prediction markets, powered by
 - **Configurable Strategy**: Easy to modify trading logic and risk parameters
 - **Comprehensive Logging**: Detailed logs for debugging and monitoring
 - **Discord Integration**: Real-time notifications and quirky AI-generated summaries
+- **X (Twitter) Integration**: Automatic posting of AI-generated trading summaries
 
 ## 🛠 Quick Start (Forking Guide)
 
@@ -64,6 +66,13 @@ FLUXOR_BOT_REBALANCE_DEVIATION=5          # Rebalance threshold (tick spacings)
 # 📢 Optional - Discord Notifications
 DISCORD_BOT_TOKEN=your_discord_bot_token
 DISCORD_CHANNEL_ID=your_discord_channel_id
+
+# 🐦 Optional - X (Twitter) Integration
+FLUXOR_BOT_X_API_KEY=your_x_api_key
+FLUXOR_BOT_X_API_SECRET=your_x_api_secret
+FLUXOR_BOT_X_ACCESS_TOKEN=your_x_access_token
+FLUXOR_BOT_X_ACCESS_TOKEN_SECRET=your_x_access_token_secret
+FLUXOR_BOT_X_BEARER_TOKEN=your_x_bearer_token
 ```
 
 ### 3. Run the Bot
@@ -95,6 +104,47 @@ Question: "Will BTC reach $100,000 by end of 2024?"
 Creates liquidity positions with 25% confidence:
 - Low position: Below 25% price range
 - High position: Above 25% price range
+```
+
+## 🐦 X (Twitter) Integration
+
+FluxorBot can automatically post AI-generated summaries to X after each trading run:
+
+### X API Setup
+
+1. **Create X Developer Account**: Visit [developer.x.com](https://developer.x.com)
+2. **Create App**: Get API credentials for your bot account
+3. **Configure Environment**: Add X API credentials to your `.env` file
+4. **Enable Integration**: FluxorBot will automatically detect and use X credentials
+
+### What Gets Posted
+
+**Daily Comprehensive Reports** (since bot runs once per day):
+
+- **Detailed Market Analysis**: Specific prediction questions analyzed with AI confidence levels
+- **Strategy Explanation**: How liquidity is positioned AROUND predictions, not at them
+- **Performance Metrics**: Markets analyzed, positions created/rebalanced, execution time
+- **Market Insights**: Analysis of prediction confidence changes and market movements
+- **Fluxor Personality**: Statistical humor, nerdy analytics, sigma symbols
+
+### Example X Posts
+
+**Single Tweet** (if content fits):
+
+```
+🤖 DAILY FLUXOR REPORT 📊 Analyzed 8 prediction markets including "BTC $100k by 2025?" (35% confidence). Deployed LP positions AROUND predictions to capture volatility. Smart positioning = alpha generation σ
+```
+
+**Tweet Thread** (for detailed daily reports):
+
+```
+🤖 DAILY FLUXOR REPORT 📊 (1/3)
+
+High-Frequency Liquidity Oracle analyzed 12 prediction markets today. Key highlights: "Will BTC reach $100k?" - 35% AI confidence, "Trump 2024 election?" - 78% confidence.
+
+(2/3) Strategy: Deployed 8 new LP positions AROUND these predictions (not AT them). Created liquidity bands above & below confidence levels to capture volatility and earn fees while providing market efficiency.
+
+(3/3) Performance: 12 markets analyzed in 15.2s, 4 rebalanced based on AI updates. Crunching p-values like it's 2025! Volatility's my playground σ
 ```
 
 ## ⚖️ Auto-Rebalancing Logic

@@ -43,6 +43,16 @@ class FluxorPostGenerator:
         """Format run data into a concise summary for the LLM"""
         stats = run_data["summary_stats"]
 
+        # Calculate total PnL for LLM context
+        total_pnl_susds = 0.0
+        markets_with_pnl = 0
+
+        market_results = run_data.get("market_results", [])
+        for market in market_results:
+            if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
+                total_pnl_susds += market["pnl_data"]["total_pnl_susds"]
+                markets_with_pnl += 1
+
         summary = f"""
 FluxorBot Run Results:
 - Duration: {run_data['duration_seconds']:.1f}s
@@ -51,12 +61,12 @@ FluxorBot Run Results:
 - Positions rebalanced: {stats['closed_positions']} closed, markets rebalanced: {stats['markets_rebalanced']}
 - Markets with no changes: {stats['markets_no_change']}
 - Errors: {stats['errors']}
+- TOTAL PnL: {total_pnl_susds:+.6f} sUSDS across {markets_with_pnl} markets
 
 Top market activities with questions:
 """
 
         # Add details about most active markets with their questions
-        market_results = run_data.get("market_results", [])
         active_markets = [m for m in market_results if m["action_taken"] in ["created_positions", "rebalanced"]]
 
         for i, market in enumerate(active_markets[:3]):  # Top 3 most active
@@ -68,8 +78,14 @@ Top market activities with questions:
             if len(question) > 80:
                 question = question[:77] + "..."
 
+            # Add PnL info if available
+            pnl_text = ""
+            if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
+                pnl_susds = market["pnl_data"]["total_pnl_susds"]
+                pnl_text = f", PnL: {pnl_susds:+.4f} sUSDS"
+
             summary += f"- Market {market['market_id']}: \"{question}\"\n"
-            summary += f"  Action: {action} {market['positions_created']} positions (AI: {ai_pred:.1f}% confidence)\n"
+            summary += f"  Action: {action} {market['positions_created']} positions (AI: {ai_pred:.1f}% confidence{pnl_text})\n"
 
         # Also include some context about markets with no action but interesting predictions
         no_action_markets = [
@@ -120,7 +136,17 @@ PERSONALITY:
 
 CATCHPHRASES: "Maximizing alpha, one LP at a time!", "Volatility's my playground, σ my guide!", "Crunching p-values like it's 2025!"
 
-Generate a quirky social media post (under 280 characters) summarizing your latest trading run. Be concise, data-driven, and include some nerdy humor. End with a sigma symbol σ.
+IMPORTANT: You provide liquidity AROUND predictions, not directly at them. You create positions both above and below your AI prediction confidence levels to capture volatility and provide market liquidity.
+
+Since you only run once per day, generate a comprehensive daily trading summary. This should be a detailed thread-worthy post (can be longer than 280 characters) that includes:
+- Specific markets you analyzed with their questions
+- Your AI predictions and confidence levels
+- Liquidity positioning strategy around those predictions
+- PROFIT/LOSS PERFORMANCE: Include PnL data prominently - this is key market performance data
+- Performance metrics and market insights
+- Nerdy statistical analysis and humor
+
+Be analytical, data-driven, and entertaining. This is your daily market report, not a quick update. ALWAYS mention PnL performance when available as it shows real trading results. End with a sigma symbol σ.
 
 RUN DATA:
 {formatted_data}
@@ -163,14 +189,43 @@ POST:"""
         """Generate a simple fallback post if OpenAI fails"""
         stats = run_data["summary_stats"]
 
-        # Simple template-based fallback
-        fallback_post = ""
+        # Comprehensive daily fallback template
+        total_markets = run_data["total_markets"]
+        duration = run_data["duration_seconds"]
+
+        # Calculate total PnL for fallback
+        total_pnl_susds = 0.0
+        markets_with_pnl = 0
+
+        market_results = run_data.get("market_results", [])
+        for market in market_results:
+            if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
+                total_pnl_susds += market["pnl_data"]["total_pnl_susds"]
+                markets_with_pnl += 1
+
+        fallback_post = f"🤖 **DAILY FLUXOR REPORT** 📊\n\n"
+        fallback_post += (
+            f"High-Frequency Liquidity Oracle analyzed {total_markets} prediction markets in {duration:.1f}s. "
+        )
+
+        # Add PnL info
+        if markets_with_pnl > 0:
+            pnl_emoji = "💰" if total_pnl_susds >= 0 else "📉"
+            fallback_post += (
+                f"{pnl_emoji} Current PnL: {total_pnl_susds:+.4f} sUSDS across {markets_with_pnl} markets. "
+            )
+
         if stats["created_positions"] > 0:
-            fallback_post = f"🤖 High-Frequency Liquidity Oracle deployed {stats['created_positions']} new positions across {stats['markets_with_new_positions']} markets! Beta adjustments complete σ"
+            fallback_post += f"Deployed {stats['created_positions']} new LP positions around AI predictions across {stats['markets_with_new_positions']} markets. "
+            fallback_post += f"Strategy: providing liquidity AROUND prediction confidence levels to capture volatility and earn fees. "
         elif stats["markets_rebalanced"] > 0:
-            fallback_post = f"⚡ Rebalanced {stats['markets_rebalanced']} markets in {run_data['duration_seconds']:.1f}s - volatility's my playground! σ"
+            fallback_post += f"Rebalanced liquidity positions in {stats['markets_rebalanced']} markets based on updated AI analysis. "
+            fallback_post += f"Smart positioning around new prediction confidence levels. "
         else:
-            fallback_post = f"📊 Analyzed {run_data['total_markets']} markets, all positions optimal. Sometimes the best trade is no trade σ"
+            fallback_post += f"All existing liquidity positions around predictions remain optimally positioned. "
+            fallback_post += f"Markets showing stable confidence levels - no rebalancing needed. "
+
+        fallback_post += f"Crunching p-values and optimizing alpha, one LP at a time! Volatility's my playground σ"
 
         self.logger.info(f"=== FALLBACK POST GENERATED ===")
         self.logger.info(f"Fallback post ({len(fallback_post)} chars): {fallback_post}")

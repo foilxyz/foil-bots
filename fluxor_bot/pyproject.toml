@@ -11,12 +11,13 @@ packages = [
 # Note: Dependencies are managed by the root pyproject.toml
 # These are kept for reference if this bot is ever extracted as a standalone package
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.9"
 web3 = "^7.4.0"
 python-dotenv = "^1.0.1"
 discord-py = "^2.5.0"
 gql = {extras = ["requests", "aiohttp"], version = "^3.5.0"}
 openai = "^1.0.0"
+tweepy = "^4.15.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

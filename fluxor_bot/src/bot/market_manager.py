@@ -14,6 +14,7 @@ from .foil import Foil
 from .llm_post_generator import FluxorPostGenerator
 from .position_manager import PositionManager
 from .strategy import FluxorStrategy
+from .x_client import XClient
 
 
 class MarketTaskResult(TypedDict):
@@ -25,6 +26,7 @@ class MarketTaskResult(TypedDict):
     positions_closed: int
     error_message: str
     execution_time_seconds: float
+    pnl_data: Optional[Dict[str, Any]]  # PnL information for positions
 
 
 class MarketTask:
@@ -71,6 +73,7 @@ class MarketTask:
             "positions_closed": 0,
             "error_message": "",
             "execution_time_seconds": 0.0,
+            "pnl_data": None,
         }
 
         try:
@@ -87,6 +90,23 @@ class MarketTask:
             strategy_result = await self.strategy.run()
             if strategy_result:
                 result.update(strategy_result)
+
+            # Collect PnL data for all positions in this market
+            self.logger.info(f"[Market {self.market_id}] Collecting PnL data for positions...")
+            try:
+                pnl_data = await self.position_manager.collect_pnl_for_market(self.market_id, self.foil.contract)
+                result["pnl_data"] = {
+                    "total_pnl_wei": pnl_data["total_pnl"],
+                    "total_pnl_susds": float(self.foil.w3.from_wei(pnl_data["total_pnl"], "ether")),
+                    "position_count": pnl_data["position_count"],
+                    "positions": pnl_data["positions_with_pnl"],
+                }
+                self.logger.info(
+                    f"[Market {self.market_id}] PnL collection completed: {result['pnl_data']['total_pnl_susds']:.6f} sUSDS"
+                )
+            except Exception as e:
+                self.logger.warning(f"[Market {self.market_id}] Failed to collect PnL data: {str(e)}")
+                result["pnl_data"] = None
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
@@ -127,6 +147,9 @@ class MarketManager:
 
         # Initialize LLM post generator
         self.post_generator = FluxorPostGenerator()
+
+        # Initialize X client
+        self.x_client = XClient()
 
         # Market tasks will be populated when run_all_markets is called
         self.market_tasks: List[MarketTask] = []
@@ -245,8 +268,19 @@ class MarketManager:
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
 
+        # Calculate total PnL across all markets
+        total_pnl_susds = 0.0
+        markets_with_pnl = 0
+
+        for result in market_summaries:
+            if result.get("pnl_data") and result["pnl_data"]["total_pnl_susds"] != 0:
+                total_pnl_susds += result["pnl_data"]["total_pnl_susds"]
+                markets_with_pnl += 1
+
         # Build comprehensive summary
-        summary_text = self._build_discord_summary(successful, failed, duration, market_summaries, errors)
+        summary_text = self._build_discord_summary(
+            successful, failed, duration, market_summaries, errors, total_pnl_susds, markets_with_pnl
+        )
 
         # Log summary (without Discord formatting)
         log_summary = f"Run Summary - Successful: {successful}, Failed: {failed}, Duration: {duration:.2f}s"
@@ -260,13 +294,27 @@ class MarketManager:
             await self._generate_and_send_fluxor_post(market_summaries, duration)
 
     def _build_discord_summary(
-        self, successful: int, failed: int, duration: float, market_summaries: List[MarketTaskResult], errors: List[str]
+        self,
+        successful: int,
+        failed: int,
+        duration: float,
+        market_summaries: List[MarketTaskResult],
+        errors: List[str],
+        total_pnl_susds: float,
+        markets_with_pnl: int,
     ) -> str:
         """Build a comprehensive Discord summary of the market run"""
 
-        # Header
+        # Header with PnL
         summary = f"📊 **FluxorBot Run Summary**\n"
-        summary += f"✅ Successful: {successful} | ❌ Failed: {failed} | ⏱️ Duration: {duration:.2f}s\n\n"
+        summary += f"✅ Successful: {successful} | ❌ Failed: {failed} | ⏱️ Duration: {duration:.2f}s\n"
+
+        # Add PnL summary
+        if markets_with_pnl > 0:
+            pnl_emoji = "💰" if total_pnl_susds >= 0 else "📉"
+            summary += f"{pnl_emoji} **Total PnL: {total_pnl_susds:+.6f} sUSDS** across {markets_with_pnl} markets\n\n"
+        else:
+            summary += "💼 No PnL data available\n\n"
 
         # Group markets by action taken
         created_markets = [m for m in market_summaries if m["action_taken"] == "created_positions"]
@@ -278,7 +326,11 @@ class MarketManager:
             total_created = sum(m["positions_created"] for m in created_markets)
             summary += f"🆕 **New Positions Created** ({len(created_markets)} markets, {total_created} positions)\n"
             for market in created_markets[:3]:  # Show first 3
-                summary += f"• Market {market['market_id']}: {market['positions_created']} pos, {market['ai_prediction']:.1f}% prediction\n"
+                pnl_text = ""
+                if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
+                    pnl_susds = market["pnl_data"]["total_pnl_susds"]
+                    pnl_text = f", PnL: {pnl_susds:+.4f} sUSDS"
+                summary += f"• Market {market['market_id']}: {market['positions_created']} pos, {market['ai_prediction']:.1f}% prediction{pnl_text}\n"
             if len(created_markets) > 3:
                 summary += f"... and {len(created_markets) - 3} more\n"
             summary += "\n"
@@ -289,7 +341,11 @@ class MarketManager:
             total_created = sum(m["positions_created"] for m in rebalanced_markets)
             summary += f"🔄 **Rebalanced** ({len(rebalanced_markets)} markets, {total_closed} closed, {total_created} created)\n"
             for market in rebalanced_markets[:3]:  # Show first 3
-                summary += f"• Market {market['market_id']}: {market['positions_closed']}→{market['positions_created']}, {market['ai_prediction']:.1f}% prediction\n"
+                pnl_text = ""
+                if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
+                    pnl_susds = market["pnl_data"]["total_pnl_susds"]
+                    pnl_text = f", PnL: {pnl_susds:+.4f} sUSDS"
+                summary += f"• Market {market['market_id']}: {market['positions_closed']}→{market['positions_created']}, {market['ai_prediction']:.1f}% prediction{pnl_text}\n"
             if len(rebalanced_markets) > 3:
                 summary += f"... and {len(rebalanced_markets) - 3} more\n"
             summary += "\n"
@@ -358,11 +414,22 @@ class MarketManager:
                 self.logger.info("OpenAI generation failed, using fallback post")
                 fluxor_post = self.post_generator.generate_fallback_post(run_data)
 
-            # Send to Discord with special formatting
+                # Send to Discord with special formatting
             fluxor_message = f"🤖 **Fluxor's Summary Post**\n\n{fluxor_post}"
             self.discord.send_message(fluxor_message)
 
             self.logger.info("Fluxor summary post sent to Discord")
+
+            # Also post to X if enabled
+            if self.x_client.is_enabled():
+                self.logger.info("Posting Fluxor summary to X...")
+                x_success = self.x_client.post_fluxor_summary(fluxor_post)
+                if x_success:
+                    self.logger.info("✅ Fluxor summary posted to X successfully")
+                else:
+                    self.logger.warning("❌ Failed to post Fluxor summary to X")
+            else:
+                self.logger.info("X integration not enabled - skipping X post")
 
         except Exception as e:
             self.logger.error(f"Failed to generate/send Fluxor post: {str(e)}")
