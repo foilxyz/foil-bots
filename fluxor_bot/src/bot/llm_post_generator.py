@@ -2,13 +2,25 @@
 LLM Post Generator for Fluxor Bot - generates quirky summary posts using OpenAI
 """
 
-import json
+import asyncio
 import logging
+import random
 from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
+import openai
 
 from .config import BotConfig
+
+
+def truncate_question(question: str, max_length: int = 50) -> str:
+    """Helper function to truncate market questions for display"""
+    if not question or question == "Unknown":
+        return "Unknown question"
+
+    if len(question) <= max_length:
+        return question
+
+    return question[: max_length - 3] + "..."
 
 
 class FluxorPostGenerator:
@@ -19,7 +31,7 @@ class FluxorPostGenerator:
         self.logger = logging.getLogger("FluxorBot")
 
         # Initialize OpenAI client
-        self.client = OpenAI(api_key=self.config.openai_api_key)
+        self.client = openai.AsyncOpenAI(api_key=self.config.openai_api_key)
 
         # Fluxor's persona
         self.persona = {
@@ -75,8 +87,7 @@ Top market activities with questions:
             question = market.get("market_question", "Unknown question")
 
             # Truncate question if too long for context
-            if len(question) > 80:
-                question = question[:77] + "..."
+            question = truncate_question(question, 80)
 
             # Add PnL info if available
             pnl_text = ""
@@ -84,7 +95,7 @@ Top market activities with questions:
                 pnl_susds = market["pnl_data"]["total_pnl_susds"]
                 pnl_text = f", PnL: {pnl_susds:+.4f} sUSDS"
 
-            summary += f"- Market {market['market_id']}: \"{question}\"\n"
+            summary += f'- "{question}"\n'
             summary += f"  Action: {action} {market['positions_created']} positions (AI: {ai_pred:.1f}% confidence{pnl_text})\n"
 
         # Also include some context about markets with no action but interesting predictions
@@ -95,8 +106,7 @@ Top market activities with questions:
             summary += "\nMarkets monitored (no action needed):\n"
             for market in no_action_markets[:2]:  # Max 2 additional
                 question = market.get("market_question", "Unknown question")
-                if len(question) > 60:
-                    question = question[:57] + "..."
+                question = truncate_question(question, 60)
                 ai_pred = market.get("ai_prediction", 0)
                 summary += f'- "{question}" (AI: {ai_pred:.1f}%)\n'
 
@@ -157,7 +167,7 @@ POST:"""
             self.logger.info("Generating Fluxor summary post with OpenAI...")
             self.logger.info(f"Using model: gpt-4o-mini, max_tokens: 100, temperature: 0.8")
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",  # Use the faster, cheaper model for this task
                 messages=[
                     {
@@ -224,6 +234,17 @@ POST:"""
         else:
             fallback_post += f"All existing liquidity positions around predictions remain optimally positioned. "
             fallback_post += f"Markets showing stable confidence levels - no rebalancing needed. "
+
+        # Add some market context
+        market_results = run_data.get("market_results", [])
+        active_markets = [m for m in market_results if m["action_taken"] in ["created_positions", "rebalanced"]]
+
+        if active_markets:
+            fallback_post += f"\n\n🎯 **Top Activity**: "
+            top_market = active_markets[0]
+            question = truncate_question(top_market.get("market_question", "Unknown"), 50)
+            ai_pred = top_market.get("ai_prediction", 0)
+            fallback_post += f'"{question}" (AI: {ai_pred:.1f}% confidence). '
 
         fallback_post += f"Crunching p-values and optimizing alpha, one LP at a time! Volatility's my playground σ"
 

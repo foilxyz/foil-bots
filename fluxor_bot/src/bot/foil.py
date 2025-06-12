@@ -9,9 +9,6 @@ from shared.utils.openai_client import OpenAIPredictor
 
 from .config import BotConfig
 
-# Remove Discord import for now to fix the error
-# from shared.clients.discord_client import DiscordNotifier
-
 
 class Epoch(TypedDict):
     epoch_id: int

@@ -29,6 +29,17 @@ class MarketTaskResult(TypedDict):
     pnl_data: Optional[Dict[str, Any]]  # PnL information for positions
 
 
+def truncate_question(question: str, max_length: int = 50) -> str:
+    """Helper function to truncate market questions for display"""
+    if not question or question == "Unknown":
+        return "Unknown question"
+
+    if len(question) <= max_length:
+        return question
+
+    return question[: max_length - 3] + "..."
+
+
 class MarketTask:
     """Represents a single market trading task"""
 
@@ -61,12 +72,15 @@ class MarketTask:
     async def run_strategy(self) -> MarketTaskResult:
         """Run the strategy for this market and return results"""
         start_time = datetime.now()
-        self.logger.info(f"🚀 [Market {self.market_id}] Starting strategy run at {start_time.strftime('%H:%M:%S')}")
+        market_question = self.market_data.get("question", "Unknown")
+        truncated_question = truncate_question(market_question, 40)
+
+        self.logger.info(f"🚀 [{truncated_question}] Starting strategy run at {start_time.strftime('%H:%M:%S')}")
 
         # Initialize result structure
         result: MarketTaskResult = {
             "market_id": self.market_id,
-            "market_question": self.market_data.get("question", "Unknown"),
+            "market_question": market_question,
             "ai_prediction": 0.0,
             "action_taken": "error",
             "positions_created": 0,
@@ -92,7 +106,7 @@ class MarketTask:
                 result.update(strategy_result)
 
             # Collect PnL data for all positions in this market
-            self.logger.info(f"[Market {self.market_id}] Collecting PnL data for positions...")
+            self.logger.info(f"[{truncated_question}] Collecting PnL data for positions...")
             try:
                 pnl_data = await self.position_manager.collect_pnl_for_market(self.market_id, self.foil.contract)
                 result["pnl_data"] = {
@@ -102,17 +116,17 @@ class MarketTask:
                     "positions": pnl_data["positions_with_pnl"],
                 }
                 self.logger.info(
-                    f"[Market {self.market_id}] PnL collection completed: {result['pnl_data']['total_pnl_susds']:.6f} sUSDS"
+                    f"[{truncated_question}] PnL collection completed: {result['pnl_data']['total_pnl_susds']:.6f} sUSDS"
                 )
             except Exception as e:
-                self.logger.warning(f"[Market {self.market_id}] Failed to collect PnL data: {str(e)}")
+                self.logger.warning(f"[{truncated_question}] Failed to collect PnL data: {str(e)}")
                 result["pnl_data"] = None
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
             result["execution_time_seconds"] = duration
 
-            self.logger.info(f"✅ [Market {self.market_id}] Strategy completed in {duration:.2f}s")
+            self.logger.info(f"✅ [{truncated_question}] Strategy completed in {duration:.2f}s")
 
             return result
 
@@ -123,7 +137,7 @@ class MarketTask:
             result["error_message"] = str(e)
             result["action_taken"] = "error"
 
-            self.logger.error(f"❌ [Market {self.market_id}] Strategy execution failed: {str(e)}")
+            self.logger.error(f"❌ [{truncated_question}] Strategy execution failed: {str(e)}")
             return result
 
 
@@ -330,7 +344,9 @@ class MarketManager:
                 if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
                     pnl_susds = market["pnl_data"]["total_pnl_susds"]
                     pnl_text = f", PnL: {pnl_susds:+.4f} sUSDS"
-                summary += f"• Market {market['market_id']}: {market['positions_created']} pos, {market['ai_prediction']:.1f}% prediction{pnl_text}\n"
+
+                question = truncate_question(market.get("market_question", "Unknown"), 45)
+                summary += f"• {question}: {market['positions_created']} pos, {market['ai_prediction']:.1f}% prediction{pnl_text}\n"
             if len(created_markets) > 3:
                 summary += f"... and {len(created_markets) - 3} more\n"
             summary += "\n"
@@ -345,7 +361,9 @@ class MarketManager:
                 if market.get("pnl_data") and market["pnl_data"]["total_pnl_susds"] != 0:
                     pnl_susds = market["pnl_data"]["total_pnl_susds"]
                     pnl_text = f", PnL: {pnl_susds:+.4f} sUSDS"
-                summary += f"• Market {market['market_id']}: {market['positions_closed']}→{market['positions_created']}, {market['ai_prediction']:.1f}% prediction{pnl_text}\n"
+
+                question = truncate_question(market.get("market_question", "Unknown"), 45)
+                summary += f"• {question}: {market['positions_closed']}→{market['positions_created']}, {market['ai_prediction']:.1f}% prediction{pnl_text}\n"
             if len(rebalanced_markets) > 3:
                 summary += f"... and {len(rebalanced_markets) - 3} more\n"
             summary += "\n"
@@ -358,7 +376,26 @@ class MarketManager:
         if errors:
             summary += f"❌ **Errors** ({len(errors)})\n"
             for error in errors[:3]:  # Show first 3 errors
-                summary += f"• {error}\n"
+                # Extract market info from error and replace with question if possible
+                error_parts = error.split(": ", 1)
+                if len(error_parts) == 2:
+                    market_id_str = error_parts[0]
+                    error_msg = error_parts[1]
+                    # Try to find the market question from market_summaries
+                    market_question = "Unknown"
+                    try:
+                        market_id = int(market_id_str)
+                        for market in market_summaries:
+                            if market["market_id"] == market_id:
+                                market_question = market.get("market_question", "Unknown")
+                                break
+                    except ValueError:
+                        pass
+
+                    question = truncate_question(market_question, 40)
+                    summary += f"• {question}: {error_msg}\n"
+                else:
+                    summary += f"• {error}\n"
             if len(errors) > 3:
                 summary += f"... and {len(errors) - 3} more errors\n"
 

@@ -6,6 +6,8 @@ from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 from web3.types import TxReceipt
 
+BASE_CHAIN_ID = 8453
+
 
 def price_to_tick(price: Union[float, Decimal], tick_spacing: int) -> int:
     """Convert a price to its corresponding tick value"""
@@ -67,7 +69,7 @@ def send_transaction(
 
         # Adjust gas pricing for different networks
         chain_id = w3.eth.chain_id
-        if chain_id == 8453:  # Base mainnet
+        if chain_id == BASE_CHAIN_ID:  # Base mainnet
             # Base mainnet often needs higher priority fees
             priority_fee = max(priority_fee, int(0.001 * 10**9))  # Minimum 0.001 gwei
             max_fee = base_fee + priority_fee * 3  # Larger buffer for Base

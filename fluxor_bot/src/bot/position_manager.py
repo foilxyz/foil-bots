@@ -269,22 +269,6 @@ class PositionManager:
 
         return market_pnl_data
 
-    async def collect_all_pnl(self) -> Dict[int, MarketPnlData]:
-        """
-        Collect PnL data for all markets with positions
-
-        Returns:
-            Dictionary mapping market_id to MarketPnlData
-        """
-        all_pnl_data = {}
-
-        for market_id in self.positions_by_market.keys():
-            # Note: We need the foil_contract for each market, but we don't have access here
-            # This method will be called from MarketManager where contracts are available
-            self.logger.info(f"Market {market_id} has positions, PnL collection will be handled by MarketManager")
-
-        return all_pnl_data
-
     async def create_position(
         self, foil_contract, epoch_data: Dict, market_params: Dict, new_lower: int, new_upper: int, market_id: int
     ) -> None:
@@ -336,7 +320,7 @@ class PositionManager:
             market_params["collateral_asset"].functions.allowance(self.account_address, foil_contract.address).call()
         )
 
-        self.logger.info(f"[Market {market_id}] Current allowance: {current_allowance}, Required: {deposit_amount}")
+        self.logger.info(f"[Market {market_id}] Current allowance: {current_allowance}, Required: {quote_amount}")
 
         # Only approve if current allowance is insufficient
         if current_allowance < deposit_amount:
