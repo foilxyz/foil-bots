@@ -282,15 +282,6 @@ class FluxorStrategy:
             if low_distance <= rebalance_deviation_ticks:
                 needs_rebalance = False
 
-        # Calculate distance to optimal high position
-        if optimal_positions["high"] is not None:
-            optimal_high_min, _ = optimal_positions["high"]
-            high_distance = abs(first_position_lower_tick - optimal_high_min)
-            self.logger.info(f"📐 [{question_display}] Distance from optimal high position: {high_distance} ticks")
-
-            if high_distance <= rebalance_deviation_ticks:
-                needs_rebalance = False
-
         if needs_rebalance:
             self.logger.info(
                 f"🔄 [{question_display}] Rebalancing needed - first position too far from both optimal positions"

@@ -187,7 +187,7 @@ class AsyncFoilAPIClient:
         if "marketGroups" in result:
             for market_group in result["marketGroups"]:
                 # Checksum market group address
-                if "address" in market_group and market_group["address"]:
+                if market_group.get("address"):
                     market_group["address"] = Web3.to_checksum_address(market_group["address"])
 
                 # Checksum collateral asset address
