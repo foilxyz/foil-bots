@@ -330,6 +330,19 @@ class MarketManager:
         else:
             summary += "💼 No PnL data available\n\n"
 
+        # Add AI Predictions section
+        summary += "🤖 **AI Predictions**\n"
+        # Sort markets by prediction confidence
+        sorted_markets = sorted(market_summaries, key=lambda x: abs(x.get("ai_prediction", 0)), reverse=True)
+        for market in sorted_markets[:5]:  # Show top 5 predictions
+            question = truncate_question(market.get("market_question", "Unknown"), 45)
+            prediction = market.get("ai_prediction", 0)
+            confidence_emoji = "🎯" if abs(prediction) > 70 else "📊"
+            summary += f"• {confidence_emoji} {question}: {prediction:+.1f}%\n"
+        if len(sorted_markets) > 5:
+            summary += f"... and {len(sorted_markets) - 5} more markets\n"
+        summary += "\n"
+
         # Group markets by action taken
         created_markets = [m for m in market_summaries if m["action_taken"] == "created_positions"]
         rebalanced_markets = [m for m in market_summaries if m["action_taken"] == "rebalanced"]
